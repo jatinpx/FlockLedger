@@ -9,8 +9,9 @@ from app.database import get_db
 from app.deps import ClientIp, CurrentUser
 from app.models import Sale
 from app.schemas.pagination import Paginated
-from app.schemas.sales import SaleCreate, SaleOut, SaleUpdate
+from app.schemas.sales import SaleCreate, SaleOut, SaleUpdate, _money2
 from app.services.audit_service import record_audit
+from app.services.production_service import EGGS_PER_TRAY
 from app.services.redis_events import publish_farm_event
 
 router = APIRouter(prefix="/farms/{farm_id}/sales", tags=["sales"])
@@ -20,12 +21,14 @@ WORKER_OK = ("owner", "manager", "worker")
 
 
 def _to_out(s: Sale) -> SaleOut:
+    rt = float(s.rate_per_tray)
     return SaleOut(
         id=s.id,
         farm_id=s.farm_id,
         buyer_name=s.buyer_name,
         trays_sold=s.trays_sold,
-        rate_per_tray=float(s.rate_per_tray),
+        rate_per_tray=rt,
+        rate_per_egg=rt / float(EGGS_PER_TRAY),
         total_amount=float(s.total_amount),
         date=s.date,
         created_at=s.created_at,
@@ -99,11 +102,26 @@ def patch_sale(
         raise HTTPException(status_code=404, detail="Not found")
     before = _row_dict(row)
     data = body.model_dump(exclude_unset=True)
+    re_raw = data.pop("rate_per_egg", None)
+
     if "buyer_name" in data:
         row.buyer_name = data["buyer_name"]
     if "trays_sold" in data:
         row.trays_sold = data["trays_sold"]
-    if "rate_per_tray" in data:
+    if re_raw is not None:
+        egg = Decimal(str(re_raw))
+        tray_from_egg = _money2(egg * Decimal(EGGS_PER_TRAY))
+        if "rate_per_tray" in data:
+            rt_new = Decimal(str(data["rate_per_tray"]))
+            if abs(rt_new - tray_from_egg) > Decimal("0.02"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"rate_per_tray must equal rate_per_egg × {EGGS_PER_TRAY}",
+                )
+            row.rate_per_tray = rt_new
+        else:
+            row.rate_per_tray = tray_from_egg
+    elif "rate_per_tray" in data:
         row.rate_per_tray = Decimal(str(data["rate_per_tray"]))
     if "total_amount" in data:
         row.total_amount = Decimal(str(data["total_amount"]))
