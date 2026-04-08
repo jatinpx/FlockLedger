@@ -1,0 +1,10 @@
+.env
+.env.local
+*.pyc
+__pycache__/
+.venv/
+venv/
+backend/ml_artifacts/*.joblib
+.DS_Store
+
+__init__.py
