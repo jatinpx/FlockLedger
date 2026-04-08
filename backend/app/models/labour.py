@@ -1,0 +1,50 @@
+import datetime as dt
+from decimal import Decimal
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.database import Base
+
+
+class FarmLabour(Base):
+    """On-farm worker or owner compensation line (not the same as app User accounts)."""
+
+    __tablename__ = "farm_labour"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    farm_id: Mapped[int] = mapped_column(ForeignKey("farms.id"), nullable=False, index=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    personnel_kind: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="labour"
+    )  # labour | owner_pay
+    compensation_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="monthly"
+    )  # daily | monthly | hourly | adhoc
+    default_rate: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    hired_at: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class LabourLedgerLine(Base):
+    """earning = farm owes more; payment = farm paid labour; adjustment = signed correction."""
+
+    __tablename__ = "labour_ledger_lines"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    farm_id: Mapped[int] = mapped_column(ForeignKey("farms.id"), nullable=False, index=True)
+    labour_id: Mapped[int] = mapped_column(ForeignKey("farm_labour.id"), nullable=False, index=True)
+    line_date: Mapped[dt.date] = mapped_column(Date, nullable=False, index=True)
+    line_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    # earning, payment, adjustment
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
