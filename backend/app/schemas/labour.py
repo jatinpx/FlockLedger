@@ -20,6 +20,10 @@ class FarmLabourCreate(BaseModel):
     default_rate: float | None = Field(None, ge=0)
     notes: str | None = None
     hired_at: Date
+    linked_user_id: int | None = Field(
+        None,
+        description="Farm member (worker role) who may view only this labour record in the app",
+    )
 
 
 class FarmLabourPatch(BaseModel):
@@ -30,6 +34,10 @@ class FarmLabourPatch(BaseModel):
     default_rate: float | None = Field(None, ge=0)
     notes: str | None = None
     is_active: bool | None = None
+    linked_user_id: int | None = Field(
+        None,
+        description="Set to null to unlink the worker app account from this row",
+    )
 
 
 class FarmLabourOut(BaseModel):
@@ -44,6 +52,7 @@ class FarmLabourOut(BaseModel):
     is_active: bool
     hired_at: Date
     balance_due: float
+    linked_user_id: int | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

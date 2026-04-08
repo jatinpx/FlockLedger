@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.farm_access import get_shed_for_farm, require_farm_member, require_farm_role
+from app.api.analytics_params import list_optional_date_range
+from app.api.farm_access import get_shed_for_farm, require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
@@ -18,7 +19,7 @@ from app.services.redis_events import publish_farm_event
 
 router = APIRouter(prefix="/farms/{farm_id}/production", tags=["production"])
 
-WORKER_OK = ("owner", "manager", "worker")
+MANAGER_ROLES = ("owner", "manager")
 
 
 def _to_out(row: EggProduction) -> EggProductionOut:
@@ -52,7 +53,7 @@ def create_egg_production(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     get_shed_for_farm(db, body.shed_id, farm_id)
     existing = (
         db.query(EggProduction)
@@ -102,7 +103,7 @@ def upsert_egg_production(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     get_shed_for_farm(db, body.shed_id, farm_id)
     row = (
         db.query(EggProduction)
@@ -149,7 +150,7 @@ def patch_egg_production(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     row = (
         db.query(EggProduction)
         .join(Shed, Shed.id == EggProduction.shed_id)
@@ -212,14 +213,20 @@ def list_egg_production(
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    dr: tuple = Depends(list_optional_date_range),
 ):
-    require_farm_member(db, user.id, farm_id)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    start_date, end_date = dr
     q = (
         db.query(EggProduction)
         .join(Shed, Shed.id == EggProduction.shed_id)
         .filter(Shed.farm_id == farm_id)
-        .order_by(EggProduction.date.desc(), EggProduction.id.desc())
     )
+    if start_date is not None:
+        q = q.filter(EggProduction.date >= start_date)
+    if end_date is not None:
+        q = q.filter(EggProduction.date <= end_date)
+    q = q.order_by(EggProduction.date.desc(), EggProduction.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     items = [_to_out(r) for r in rows]

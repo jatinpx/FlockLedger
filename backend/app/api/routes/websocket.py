@@ -40,6 +40,9 @@ async def farm_events_ws(
         if not m:
             await websocket.close(code=4403)
             return
+        if m.role == "worker":
+            await websocket.close(code=4403)
+            return
     finally:
         db.close()
 

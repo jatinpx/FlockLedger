@@ -6,10 +6,12 @@ import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
 import {
   apiFetch,
+  type FarmMemberRow,
   type FarmLabourRow,
   type LabourLedgerRow,
   type Paginated,
 } from "@/lib/api";
+import { pageQuery } from "@/lib/pagination";
 import { toastError, toastSuccess } from "@/lib/toast";
 
 const DEFAULT_LIMIT = 25;
@@ -18,12 +20,20 @@ const LEDGER_LIMIT = 50;
 const fmtInr = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
 
+function workerMembersFreeForCreate(rows: FarmLabourRow[], members: FarmMemberRow[]) {
+  const taken = new Set(
+    rows.map((r) => r.linked_user_id).filter((id): id is number => id != null)
+  );
+  return members.filter((m) => !taken.has(m.user_id));
+}
+
 export default function LabourPage() {
   const { farms, farmId } = useFarm();
   const runLoaded = useAsyncLoader();
   const currentFarm = farms.find((f) => f.id === farmId);
   const canManage =
     currentFarm?.my_role === "owner" || currentFarm?.my_role === "manager";
+  const isWorker = currentFarm?.my_role === "worker";
 
   const [rows, setRows] = useState<FarmLabourRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -51,6 +61,8 @@ export default function LabourPage() {
   const [lineDate, setLineDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [lineDesc, setLineDesc] = useState("");
   const [forceInactive, setForceInactive] = useState(false);
+  const [linkUserId, setLinkUserId] = useState("");
+  const [workerMembers, setWorkerMembers] = useState<FarmMemberRow[]>([]);
 
   const refresh = useCallback(async () => {
     if (!farmId) return;
@@ -86,6 +98,23 @@ export default function LabourPage() {
     refresh().catch((e) => toastError(e));
   }, [refresh]);
 
+  useEffect(() => {
+    if (!farmId || !canManage) {
+      setWorkerMembers([]);
+      return;
+    }
+    apiFetch<Paginated<FarmMemberRow>>(`/farms/${farmId}/members?${pageQuery(500, 0)}`)
+      .then((res) => setWorkerMembers(res.items.filter((m) => m.role === "worker")))
+      .catch(() => setWorkerMembers([]));
+  }, [farmId, canManage]);
+
+  useEffect(() => {
+    if (canManage || !isWorker) return;
+    if (rows.length === 1 && selectedId == null) {
+      setSelectedId(rows[0].id);
+    }
+  }, [canManage, isWorker, rows, selectedId]);
+
   useLayoutEffect(() => {
     setLedgerOffset(0);
   }, [selectedId, ledgerLimit]);
@@ -114,6 +143,7 @@ export default function LabourPage() {
             default_rate: defaultRate.trim() ? parseFloat(defaultRate) : null,
             notes: notes.trim() || null,
             hired_at: hiredAt,
+            linked_user_id: linkUserId.trim() ? parseInt(linkUserId, 10) : null,
           }),
         });
       });
@@ -122,6 +152,7 @@ export default function LabourPage() {
       setPhone("");
       setNotes("");
       setDefaultRate("");
+      setLinkUserId("");
       await refresh();
     } catch (err) {
       toastError(err);
@@ -178,6 +209,35 @@ export default function LabourPage() {
     }
   }
 
+  function membersAvailableForRow(r: FarmLabourRow): FarmMemberRow[] {
+    const taken = new Set(
+      rows
+        .filter((x) => x.id !== r.id && x.linked_user_id != null)
+        .map((x) => x.linked_user_id as number)
+    );
+    return workerMembers.filter(
+      (m) => !taken.has(m.user_id) || m.user_id === r.linked_user_id
+    );
+  }
+
+  async function patchLabourLink(labourId: number, raw: string) {
+    if (!farmId || !canManage) return;
+    const linked_user_id = raw === "" ? null : Number(raw);
+    if (linked_user_id !== null && Number.isNaN(linked_user_id)) return;
+    try {
+      await runLoaded(async () => {
+        await apiFetch(`/farms/${farmId}/labour/${labourId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ linked_user_id }),
+        });
+      });
+      toastSuccess("Link updated.");
+      await refresh();
+    } catch (err) {
+      toastError(err);
+    }
+  }
+
   async function deleteLedgerLine(lineId: number) {
     if (!farmId || selectedId == null || !canManage) return;
     if (!window.confirm("Remove this ledger line? Balances will update.")) return;
@@ -204,11 +264,24 @@ export default function LabourPage() {
 
   return (
     <div className="space-y-8">
-      <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-sm text-amber-950">
-        <strong>Balances:</strong> positive means the farm still owes that person.{" "}
-        <strong>Earning</strong> increases what you owe; <strong>payment</strong> reduces it.{" "}
-        <strong>Adjustment</strong> moves the balance up or down (corrections, advances, write-offs).
-      </div>
+      {isWorker ? (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+          This page shows <strong>your</strong> pay balance and ledger for this farm. If you see no
+          record, ask a manager to link your app account to your labour profile.
+        </div>
+      ) : (
+        <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/35 dark:text-amber-100">
+          <strong>Balances:</strong> positive means the farm still owes that person.{" "}
+          <strong>Earning</strong> increases what you owe; <strong>payment</strong> reduces it.{" "}
+          <strong>Adjustment</strong> moves the balance up or down (corrections, advances, write-offs).
+        </div>
+      )}
+
+      {isWorker && rows.length === 0 ? (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          No labour record is linked to your account for this farm yet.
+        </p>
+      ) : null}
 
       {canManage ? (
         <form
@@ -290,6 +363,26 @@ export default function LabourPage() {
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">
+                Link worker app login (optional)
+              </label>
+              <select
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                value={linkUserId}
+                onChange={(e) => setLinkUserId(e.target.value)}
+              >
+                <option value="">Not linked</option>
+                {workerMembersFreeForCreate(rows, workerMembers).map((m) => (
+                  <option key={m.user_id} value={String(m.user_id)}>
+                    {m.name} ({m.email})
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Lets that user see only this row and its ledger in the app.
+              </p>
+            </div>
           </div>
           <button
             type="submit"
@@ -302,8 +395,14 @@ export default function LabourPage() {
 
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="border-b border-zinc-100 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">People</h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Select a row to view or post ledger lines.</p>
+          <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            {isWorker ? "Your record" : "People"}
+          </h2>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            {isWorker
+              ? "Your balance and payment history."
+              : "Select a row to view or post ledger lines."}
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -314,6 +413,7 @@ export default function LabourPage() {
                 <th className="px-4 py-3">Pay</th>
                 <th className="px-4 py-3">Balance</th>
                 <th className="px-4 py-3">Active</th>
+                {canManage ? <th className="px-4 py-3">App link</th> : null}
                 {canManage ? <th className="px-4 py-3" /> : null}
               </tr>
             </thead>
@@ -334,7 +434,7 @@ export default function LabourPage() {
                   <td
                     className={`px-4 py-3 font-medium ${
                       r.balance_due > 0
-                        ? "text-amber-800"
+                        ? "text-amber-800 dark:text-amber-400"
                         : r.balance_due < 0
                           ? "text-emerald-800 dark:text-emerald-400"
                           : "text-zinc-600 dark:text-zinc-400"
@@ -342,7 +442,25 @@ export default function LabourPage() {
                   >
                     {fmtInr(r.balance_due)}
                   </td>
-                  <td className="px-4 py-3">{r.is_active ? "Yes" : "No"}</td>
+                  <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                    {r.is_active ? "Yes" : "No"}
+                  </td>
+                  {canManage ? (
+                    <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+                      <select
+                        className="max-w-[200px] rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                        value={r.linked_user_id ?? ""}
+                        onChange={(e) => void patchLabourLink(r.id, e.target.value)}
+                      >
+                        <option value="">Not linked</option>
+                        {membersAvailableForRow(r).map((m) => (
+                          <option key={m.user_id} value={String(m.user_id)}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  ) : null}
                   {canManage ? (
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
@@ -369,7 +487,7 @@ export default function LabourPage() {
       </div>
 
       {selectedId != null && selected ? (
-        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-zinc-950/40">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             Ledger — {selected.full_name}
           </h2>
@@ -450,39 +568,48 @@ export default function LabourPage() {
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Managers can post payments and earnings.</p>
           )}
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-zinc-100 text-xs uppercase text-zinc-500 dark:text-zinc-400">
-                <tr>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Amount</th>
-                  <th className="px-3 py-2">Note</th>
-                  {canManage ? <th className="px-3 py-2" /> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {ledgerRows.map((L) => (
-                  <tr key={L.id} className="border-b border-zinc-50 dark:border-zinc-800/80">
-                    <td className="px-3 py-2">{L.line_date}</td>
-                    <td className="px-3 py-2">{L.line_type}</td>
-                    <td className="px-3 py-2">{fmtInr(L.amount)}</td>
-                    <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{L.description ?? "—"}</td>
-                    {canManage ? (
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          className="text-xs text-red-700 hover:underline"
-                          onClick={() => void deleteLedgerLine(L.id)}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    ) : null}
+          <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-zinc-100 bg-zinc-50 text-xs uppercase text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400">
+                  <tr>
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">Type</th>
+                    <th className="px-3 py-2">Amount</th>
+                    <th className="px-3 py-2">Note</th>
+                    {canManage ? <th className="px-3 py-2" /> : null}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white dark:bg-zinc-900">
+                  {ledgerRows.map((L) => (
+                    <tr
+                      key={L.id}
+                      className="border-b border-zinc-100 bg-white last:border-b-0 dark:border-zinc-800/80 dark:bg-zinc-900"
+                    >
+                      <td className="px-3 py-2 text-zinc-900 dark:text-zinc-100">{L.line_date}</td>
+                      <td className="px-3 py-2 capitalize text-zinc-900 dark:text-zinc-100">
+                        {L.line_type}
+                      </td>
+                      <td className="px-3 py-2 font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+                        {fmtInr(L.amount)}
+                      </td>
+                      <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{L.description ?? "—"}</td>
+                      {canManage ? (
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            className="text-xs text-red-700 hover:underline dark:text-red-400 dark:hover:text-red-300"
+                            onClick={() => void deleteLedgerLine(L.id)}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           {ledgerTotal > 0 ? (
             <PaginationFooter

@@ -3,11 +3,12 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.analytics_params import list_optional_date_range
 from app.api.farm_access import require_farm_member, require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
-from app.models import FarmLabour, LabourLedgerLine
+from app.models import FarmLabour, FarmMember, LabourLedgerLine
 from app.schemas.labour import (
     FarmLabourCreate,
     FarmLabourOut,
@@ -26,6 +27,38 @@ router = APIRouter(prefix="/farms/{farm_id}/labour", tags=["labour"])
 MANAGER_ROLES = ("owner", "manager")
 
 
+def _ensure_linked_user_valid(
+    db: Session,
+    farm_id: int,
+    linked_user_id: int | None,
+    *,
+    exclude_labour_id: int | None = None,
+) -> None:
+    if linked_user_id is None:
+        return
+    mem = (
+        db.query(FarmMember)
+        .filter(FarmMember.farm_id == farm_id, FarmMember.user_id == linked_user_id)
+        .first()
+    )
+    if not mem or mem.role != "worker":
+        raise HTTPException(
+            status_code=400,
+            detail="linked_user_id must be a worker member of this farm",
+        )
+    q = db.query(FarmLabour).filter(
+        FarmLabour.farm_id == farm_id,
+        FarmLabour.linked_user_id == linked_user_id,
+    )
+    if exclude_labour_id is not None:
+        q = q.filter(FarmLabour.id != exclude_labour_id)
+    if q.first():
+        raise HTTPException(
+            status_code=400,
+            detail="This user is already linked to another labour record on this farm",
+        )
+
+
 def _labour_to_out(db: Session, row: FarmLabour) -> FarmLabourOut:
     return FarmLabourOut(
         id=row.id,
@@ -39,19 +72,18 @@ def _labour_to_out(db: Session, row: FarmLabour) -> FarmLabourOut:
         is_active=row.is_active,
         hired_at=row.hired_at,
         balance_due=float(ledger_balance(db, row.id)),
+        linked_user_id=row.linked_user_id,
         created_at=row.created_at,
     )
 
 
 @router.get("/summary", response_model=list[LabourBalanceRow])
 def labour_summary(farm_id: int, user: CurrentUser, db: Session = Depends(get_db)):
-    require_farm_member(db, user.id, farm_id)
-    rows = (
-        db.query(FarmLabour)
-        .filter(FarmLabour.farm_id == farm_id)
-        .order_by(FarmLabour.personnel_kind.asc(), FarmLabour.full_name.asc())
-        .all()
-    )
+    m = require_farm_member(db, user.id, farm_id)
+    q = db.query(FarmLabour).filter(FarmLabour.farm_id == farm_id)
+    if m.role == "worker":
+        q = q.filter(FarmLabour.linked_user_id == user.id)
+    rows = q.order_by(FarmLabour.personnel_kind.asc(), FarmLabour.full_name.asc()).all()
     return [
         LabourBalanceRow(
             labour_id=r.id,
@@ -64,6 +96,22 @@ def labour_summary(farm_id: int, user: CurrentUser, db: Session = Depends(get_db
     ]
 
 
+@router.get("/me", response_model=FarmLabourOut | None)
+def get_my_labour_row(farm_id: int, user: CurrentUser, db: Session = Depends(get_db)):
+    require_farm_member(db, user.id, farm_id)
+    row = (
+        db.query(FarmLabour)
+        .filter(
+            FarmLabour.farm_id == farm_id,
+            FarmLabour.linked_user_id == user.id,
+        )
+        .first()
+    )
+    if not row:
+        return None
+    return _labour_to_out(db, row)
+
+
 @router.get("", response_model=Paginated[FarmLabourOut])
 def list_labour(
     farm_id: int,
@@ -71,12 +119,11 @@ def list_labour(
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
 ):
-    require_farm_member(db, user.id, farm_id)
-    q = (
-        db.query(FarmLabour)
-        .filter(FarmLabour.farm_id == farm_id)
-        .order_by(FarmLabour.is_active.desc(), FarmLabour.full_name.asc())
-    )
+    m = require_farm_member(db, user.id, farm_id)
+    q = db.query(FarmLabour).filter(FarmLabour.farm_id == farm_id)
+    if m.role == "worker":
+        q = q.filter(FarmLabour.linked_user_id == user.id)
+    q = q.order_by(FarmLabour.is_active.desc(), FarmLabour.full_name.asc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     items = [_labour_to_out(db, r) for r in rows]
@@ -92,6 +139,7 @@ def create_labour(
     db: Session = Depends(get_db),
 ):
     require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    _ensure_linked_user_valid(db, farm_id, body.linked_user_id)
     row = FarmLabour(
         farm_id=farm_id,
         full_name=body.full_name.strip(),
@@ -101,6 +149,7 @@ def create_labour(
         default_rate=Decimal(str(body.default_rate)) if body.default_rate is not None else None,
         notes=body.notes,
         hired_at=body.hired_at,
+        linked_user_id=body.linked_user_id,
         is_active=True,
     )
     db.add(row)
@@ -157,6 +206,11 @@ def patch_labour(
         row.notes = data["notes"]
     if "is_active" in data and data["is_active"] is not None:
         row.is_active = data["is_active"]
+    if "linked_user_id" in data:
+        _ensure_linked_user_valid(
+            db, farm_id, data["linked_user_id"], exclude_labour_id=labour_id
+        )
+        row.linked_user_id = data["linked_user_id"]
     record_audit(
         db,
         user_id=user.id,
@@ -245,8 +299,9 @@ def list_ledger(
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    dr: tuple = Depends(list_optional_date_range),
 ):
-    require_farm_member(db, user.id, farm_id)
+    m = require_farm_member(db, user.id, farm_id)
     exists = (
         db.query(FarmLabour)
         .filter(FarmLabour.id == labour_id, FarmLabour.farm_id == farm_id)
@@ -254,14 +309,21 @@ def list_ledger(
     )
     if not exists:
         raise HTTPException(status_code=404, detail="Labour not found")
-    q = (
-        db.query(LabourLedgerLine)
-        .filter(
-            LabourLedgerLine.labour_id == labour_id,
-            LabourLedgerLine.farm_id == farm_id,
+    if m.role == "worker" and exists.linked_user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own pay and ledger",
         )
-        .order_by(LabourLedgerLine.line_date.desc(), LabourLedgerLine.id.desc())
+    start_date, end_date = dr
+    q = db.query(LabourLedgerLine).filter(
+        LabourLedgerLine.labour_id == labour_id,
+        LabourLedgerLine.farm_id == farm_id,
     )
+    if start_date is not None:
+        q = q.filter(LabourLedgerLine.line_date >= start_date)
+    if end_date is not None:
+        q = q.filter(LabourLedgerLine.line_date <= end_date)
+    q = q.order_by(LabourLedgerLine.line_date.desc(), LabourLedgerLine.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     items = [

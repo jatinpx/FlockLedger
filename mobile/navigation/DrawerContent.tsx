@@ -18,11 +18,16 @@ const MAIN_LINKS: { route: string; label: string }[] = [
   { route: "Settings", label: "Settings" },
 ];
 
+const WORKER_LINKS: { route: string; label: string }[] = [
+  { route: "Labour", label: "My pay & ledger" },
+];
+
 /** Same order and labels as web `AppShell` sidebar. */
 export function AppDrawerContent(props: DrawerContentComponentProps) {
   const { navigation, state } = props;
-  const { farms, farmId } = useFarm();
+  const { farms, farmId, loading } = useFarm();
   const current = farms.find((f) => f.id === farmId);
+  const isWorker = !loading && current?.my_role === "worker";
   const canSeeAudit =
     current?.my_role === "owner" || current?.my_role === "manager";
   const active = state.routes[state.index]?.name;
@@ -33,9 +38,11 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
     parent?.reset({ index: 0, routes: [{ name: "Login" as never }] });
   }
 
-  const links = canSeeAudit
-    ? [...MAIN_LINKS, { route: "Audit", label: "Audit log" }]
-    : MAIN_LINKS;
+  const links = isWorker
+    ? WORKER_LINKS
+    : canSeeAudit
+      ? [...MAIN_LINKS, { route: "Audit", label: "Audit log" }]
+      : MAIN_LINKS;
 
   return (
     <DrawerContentScrollView

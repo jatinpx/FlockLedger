@@ -1,5 +1,6 @@
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { FarmHeaderButton } from "../components/FarmHeaderButton";
+import { useFarm } from "../lib/farm-context";
 import { AppDrawerContent } from "./DrawerContent";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { ProductionScreen } from "../screens/ProductionScreen";
@@ -29,11 +30,15 @@ const Drawer = createDrawerNavigator<DrawerParamList>();
 
 const headerRight = () => <FarmHeaderButton />;
 
-export function MainDrawer() {
+function MainDrawerInner() {
+  const { farms, farmId, loading } = useFarm();
+  const current = farms.find((f) => f.id === farmId);
+  const workerOnly = !loading && current?.my_role === "worker";
+
   return (
     <Drawer.Navigator
       drawerContent={(props) => <AppDrawerContent {...props} />}
-      initialRouteName="Dashboard"
+      initialRouteName={workerOnly ? "Labour" : "Dashboard"}
       screenOptions={{
         headerShown: true,
         headerTitle: "FlockLedger",
@@ -42,36 +47,69 @@ export function MainDrawer() {
         drawerStyle: { width: 280 },
       }}
     >
+      {!workerOnly ? (
+        <Drawer.Screen
+          name="Dashboard"
+          component={DashboardScreen}
+          options={{ title: "Dashboard", headerTitle: "Dashboard" }}
+        />
+      ) : null}
+      {!workerOnly ? (
+        <Drawer.Screen
+          name="Production"
+          component={ProductionScreen}
+          options={{ title: "Production", headerTitle: "Production" }}
+        />
+      ) : null}
+      {!workerOnly ? (
+        <Drawer.Screen name="Feed" component={FeedScreen} options={{ title: "Feed", headerTitle: "Feed" }} />
+      ) : null}
       <Drawer.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{ title: "Dashboard", headerTitle: "Dashboard" }}
+        name="Labour"
+        component={LabourScreen}
+        options={{
+          title: workerOnly ? "My pay" : "Labour",
+          headerTitle: workerOnly ? "My pay & ledger" : "Labour",
+        }}
       />
-      <Drawer.Screen
-        name="Production"
-        component={ProductionScreen}
-        options={{ title: "Production", headerTitle: "Production" }}
-      />
-      <Drawer.Screen name="Feed" component={FeedScreen} options={{ title: "Feed", headerTitle: "Feed" }} />
-      <Drawer.Screen name="Labour" component={LabourScreen} options={{ title: "Labour", headerTitle: "Labour" }} />
-      <Drawer.Screen name="Flock" component={FlockScreen} options={{ title: "Flock", headerTitle: "Flock" }} />
-      <Drawer.Screen name="Sales" component={SalesScreen} options={{ title: "Sales", headerTitle: "Sales" }} />
-      <Drawer.Screen
-        name="Expenses"
-        component={ExpensesScreen}
-        options={{ title: "Expenses", headerTitle: "Expenses" }}
-      />
-      <Drawer.Screen
-        name="Analytics"
-        component={AnalyticsScreen}
-        options={{ title: "Analytics", headerTitle: "Analytics" }}
-      />
-      <Drawer.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ title: "Settings", headerTitle: "Settings" }}
-      />
-      <Drawer.Screen name="Audit" component={AuditScreen} options={{ title: "Audit log", headerTitle: "Audit log" }} />
+      {!workerOnly ? (
+        <Drawer.Screen name="Flock" component={FlockScreen} options={{ title: "Flock", headerTitle: "Flock" }} />
+      ) : null}
+      {!workerOnly ? (
+        <Drawer.Screen name="Sales" component={SalesScreen} options={{ title: "Sales", headerTitle: "Sales" }} />
+      ) : null}
+      {!workerOnly ? (
+        <Drawer.Screen
+          name="Expenses"
+          component={ExpensesScreen}
+          options={{ title: "Expenses", headerTitle: "Expenses" }}
+        />
+      ) : null}
+      {!workerOnly ? (
+        <Drawer.Screen
+          name="Analytics"
+          component={AnalyticsScreen}
+          options={{ title: "Analytics", headerTitle: "Analytics" }}
+        />
+      ) : null}
+      {!workerOnly ? (
+        <Drawer.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{ title: "Settings", headerTitle: "Settings" }}
+        />
+      ) : null}
+      {!workerOnly ? (
+        <Drawer.Screen
+          name="Audit"
+          component={AuditScreen}
+          options={{ title: "Audit log", headerTitle: "Audit log" }}
+        />
+      ) : null}
     </Drawer.Navigator>
   );
+}
+
+export function MainDrawer() {
+  return <MainDrawerInner />;
 }

@@ -4,10 +4,23 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { PaginationFooter, withPagination } from "@/components/PaginationFooter";
 import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
-import { apiFetch, type ExpenseRow, type Paginated } from "@/lib/api";
+import {
+  apiFetch,
+  fetchExpenseCategories,
+  MISCELLANEOUS_EXPENSE_CATEGORY,
+  type ExpenseRow,
+  type Paginated,
+} from "@/lib/api";
 import { toastError, toastSuccess } from "@/lib/toast";
 
 const DEFAULT_LIMIT = 25;
+
+function categoryOptionsWithLegacy(predefined: string[], current: string): string[] {
+  if (current && !predefined.includes(current)) {
+    return [current, ...predefined];
+  }
+  return predefined;
+}
 
 export default function ExpensesPage() {
   const { farmId } = useFarm();
@@ -16,7 +29,8 @@ export default function ExpensesPage() {
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
   const [offset, setOffset] = useState(0);
-  const [category, setCategory] = useState("feed");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [category, setCategory] = useState("Feed & fodder");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(() =>
@@ -48,9 +62,28 @@ export default function ExpensesPage() {
     refresh().catch((err) => toastError(err));
   }, [refresh]);
 
+  useEffect(() => {
+    fetchExpenseCategories()
+      .then((list) => setCategories(list))
+      .catch((err) => toastError(err));
+  }, []);
+
+  useEffect(() => {
+    if (!categories.length) return;
+    setCategory((prev) => (categories.includes(prev) ? prev : categories[0]));
+  }, [categories]);
+
+  const miscNeedsDescription = category === MISCELLANEOUS_EXPENSE_CATEGORY;
+  const editMiscNeedsDescription = editCategory === MISCELLANEOUS_EXPENSE_CATEGORY;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!farmId) return;
+    const descTrim = description.trim();
+    if (miscNeedsDescription && !descTrim) {
+      toastError(new Error("Add a short description for Miscellaneous expenses."));
+      return;
+    }
     try {
       await runLoaded(async () => {
         await apiFetch(`/farms/${farmId}/expenses`, {
@@ -58,7 +91,7 @@ export default function ExpensesPage() {
           body: JSON.stringify({
             category,
             amount: parseFloat(amount),
-            description: description || null,
+            description: descTrim ? descTrim : null,
             date,
           }),
         });
@@ -82,6 +115,11 @@ export default function ExpensesPage() {
 
   async function saveEdit() {
     if (!farmId || editingId == null) return;
+    const editDescTrim = editDescription.trim();
+    if (editMiscNeedsDescription && !editDescTrim) {
+      toastError(new Error("Add a short description for Miscellaneous expenses."));
+      return;
+    }
     try {
       await runLoaded(async () => {
         await apiFetch(`/farms/${farmId}/expenses/${editingId}`, {
@@ -89,7 +127,7 @@ export default function ExpensesPage() {
           body: JSON.stringify({
             category: editCategory,
             amount: parseFloat(editAmount),
-            description: editDescription.trim() || null,
+            description: editDescTrim ? editDescTrim : null,
             date: editDate,
           }),
         });
@@ -124,12 +162,25 @@ export default function ExpensesPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="text-sm text-zinc-600 dark:text-zinc-400">Category</label>
-            <input
+            <select
               className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              value={category}
+              value={
+                !categories.length ? "" : categories.includes(category) ? category : categories[0]
+              }
               onChange={(e) => setCategory(e.target.value)}
               required
-            />
+              disabled={!categories.length}
+            >
+              {!categories.length ? (
+                <option value="">Loading categories…</option>
+              ) : (
+                categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))
+              )}
+            </select>
           </div>
           <div>
             <label className="text-sm text-zinc-600 dark:text-zinc-400">Amount (₹)</label>
@@ -144,11 +195,20 @@ export default function ExpensesPage() {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="text-sm text-zinc-600 dark:text-zinc-400">Description</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">
+              Description
+              {miscNeedsDescription ? (
+                <span className="text-red-600 dark:text-red-400"> (required)</span>
+              ) : null}
+            </label>
             <input
               className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              required={miscNeedsDescription}
+              placeholder={
+                miscNeedsDescription ? "What was this expense for?" : "Optional note"
+              }
             />
           </div>
           <div className="sm:col-span-2">
@@ -164,7 +224,8 @@ export default function ExpensesPage() {
         </div>
         <button
           type="submit"
-          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+          disabled={!categories.length}
+          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
         >
           Save
         </button>
@@ -195,11 +256,23 @@ export default function ExpensesPage() {
                       />
                     </td>
                     <td className="px-4 py-2 align-top">
-                      <input
-                        className="min-w-[80px] rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                        value={editCategory}
+                      <select
+                        className="max-w-[220px] rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                        value={
+                          (() => {
+                            const opts = categoryOptionsWithLegacy(categories, editCategory);
+                            return opts.includes(editCategory) ? editCategory : opts[0] ?? "";
+                          })()
+                        }
                         onChange={(e) => setEditCategory(e.target.value)}
-                      />
+                        disabled={!categories.length && !editCategory}
+                      >
+                        {categoryOptionsWithLegacy(categories, editCategory).map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-2 align-top">
                       <input
@@ -216,6 +289,10 @@ export default function ExpensesPage() {
                         className="min-w-[120px] rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                         value={editDescription}
                         onChange={(e) => setEditDescription(e.target.value)}
+                        required={editMiscNeedsDescription}
+                        placeholder={
+                          editMiscNeedsDescription ? "Required for Miscellaneous" : "Note"
+                        }
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 align-top">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FarmPicker } from "@/components/FarmPicker";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { WorkerRouteGuard } from "@/components/WorkerRouteGuard";
 import { setToken } from "@/lib/api";
 import { useFarm } from "@/lib/farm-context";
 
@@ -19,16 +20,21 @@ const mainLinks = [
   { href: "/settings", label: "Settings" },
 ];
 
+const workerLinks = [{ href: "/labour", label: "My pay & ledger" }];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { farms, farmId, setFarmId, loading, membersCacheEpoch } = useFarm();
   const currentFarm = farms.find((f) => f.id === farmId);
+  const isWorker = !loading && currentFarm?.my_role === "worker";
   const canSeeAudit =
     currentFarm?.my_role === "owner" || currentFarm?.my_role === "manager";
-  const links = canSeeAudit
-    ? [...mainLinks, { href: "/audit", label: "Audit log" }]
-    : mainLinks;
+  const links = isWorker
+    ? workerLinks
+    : canSeeAudit
+      ? [...mainLinks, { href: "/audit", label: "Audit log" }]
+      : mainLinks;
 
   function logout() {
     setToken(null);
@@ -90,7 +96,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="p-8">{children}</main>
+        <main className="p-8">
+          <WorkerRouteGuard>{children}</WorkerRouteGuard>
+        </main>
       </div>
     </div>
   );

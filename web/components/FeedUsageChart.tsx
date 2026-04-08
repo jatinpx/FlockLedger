@@ -16,13 +16,14 @@ type Point = {
   feed_received: number;
   feed_used: number;
   feed_remaining: number;
+  period_label?: string;
 };
 
 export function FeedUsageChart({ data }: { data: Point[] }) {
   const pal = useChartPalette();
   const chartData = data.map((d) => ({
     ...d,
-    label: d.date.slice(5),
+    label: d.period_label ?? d.date.slice(5),
   }));
   return (
     <div className="h-72 w-full rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

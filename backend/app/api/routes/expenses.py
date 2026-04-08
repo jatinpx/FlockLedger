@@ -3,10 +3,12 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.farm_access import require_farm_member, require_farm_role
+from app.api.analytics_params import list_optional_date_range
+from app.api.farm_access import require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
+from app.constants.expense_categories import misc_requires_description
 from app.models import Expense
 from app.schemas.expenses import ExpenseCreate, ExpenseOut, ExpenseUpdate
 from app.schemas.pagination import Paginated
@@ -91,6 +93,13 @@ def patch_expense(
         raise HTTPException(status_code=404, detail="Not found")
     before = _row_dict(row)
     data = body.model_dump(exclude_unset=True)
+    new_cat = data.get("category", row.category)
+    new_desc = data["description"] if "description" in data else row.description
+    if misc_requires_description(new_cat, new_desc):
+        raise HTTPException(
+            status_code=422,
+            detail="Description is required when category is Miscellaneous.",
+        )
     if "category" in data:
         row.category = data["category"]
     if "amount" in data:
@@ -123,13 +132,16 @@ def list_expenses(
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    dr: tuple = Depends(list_optional_date_range),
 ):
-    require_farm_member(db, user.id, farm_id)
-    q = (
-        db.query(Expense)
-        .filter(Expense.farm_id == farm_id)
-        .order_by(Expense.date.desc(), Expense.id.desc())
-    )
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    start_date, end_date = dr
+    q = db.query(Expense).filter(Expense.farm_id == farm_id)
+    if start_date is not None:
+        q = q.filter(Expense.date >= start_date)
+    if end_date is not None:
+        q = q.filter(Expense.date <= end_date)
+    q = q.order_by(Expense.date.desc(), Expense.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     items = [_to_out(r) for r in rows]

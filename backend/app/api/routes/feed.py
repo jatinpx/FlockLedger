@@ -4,7 +4,8 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.farm_access import require_farm_member, require_farm_role
+from app.api.analytics_params import list_optional_date_range
+from app.api.farm_access import require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
@@ -24,7 +25,6 @@ from app.services.redis_events import publish_farm_event
 router = APIRouter(prefix="/farms/{farm_id}/feed", tags=["feed"])
 
 MANAGER_ROLES = ("owner", "manager")
-WORKER_OK = ("owner", "manager", "worker")
 
 
 def _to_out(r: FeedInventory) -> FeedInventoryOut:
@@ -60,7 +60,7 @@ def preview_feed_opening(
     date: dt_date = Query(..., description="ISO date for the new row"),
 ):
     """Opening kg for a new row on this date (same rules as create)."""
-    require_farm_member(db, user.id, farm_id)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     assert_no_later_feed_date(db, farm_id, date)
     opening = opening_balance_kg(db, farm_id, date)
     return {"opening_balance_kg": float(opening), "date": str(date)}
@@ -74,7 +74,7 @@ def create_feed_entry(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     opening = opening_balance_kg(db, farm_id, body.date)
     recv = Decimal(str(body.feed_received))
     used = Decimal(str(body.feed_used))
@@ -121,7 +121,7 @@ def patch_feed_entry(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     row = (
         db.query(FeedInventory)
         .filter(FeedInventory.id == record_id, FeedInventory.farm_id == farm_id)
@@ -176,13 +176,16 @@ def list_feed(
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    dr: tuple = Depends(list_optional_date_range),
 ):
-    require_farm_member(db, user.id, farm_id)
-    q = (
-        db.query(FeedInventory)
-        .filter(FeedInventory.farm_id == farm_id)
-        .order_by(FeedInventory.date.desc(), FeedInventory.id.desc())
-    )
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    start_date, end_date = dr
+    q = db.query(FeedInventory).filter(FeedInventory.farm_id == farm_id)
+    if start_date is not None:
+        q = q.filter(FeedInventory.date >= start_date)
+    if end_date is not None:
+        q = q.filter(FeedInventory.date <= end_date)
+    q = q.order_by(FeedInventory.date.desc(), FeedInventory.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     items = [_to_out(r) for r in rows]

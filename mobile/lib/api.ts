@@ -141,6 +141,12 @@ export type SaleRow = {
   created_at: string;
 };
 
+export const MISCELLANEOUS_EXPENSE_CATEGORY = "Miscellaneous" as const;
+
+export async function fetchExpenseCategories(): Promise<string[]> {
+  return apiFetch<string[]>("/expense-categories");
+}
+
 export type ExpenseRow = {
   id: number;
   farm_id: number;
@@ -153,6 +159,10 @@ export type ExpenseRow = {
 
 export type DashboardSummary = {
   farm_id: number;
+  period_start: string;
+  period_end: string;
+  period_usable_eggs: number;
+  period_trays: number;
   total_birds: number;
   tray_stock: {
     trays_produced_equivalent: number;
@@ -160,12 +170,20 @@ export type DashboardSummary = {
     trays_in_stock: number;
     usable_eggs_equivalent: number;
   };
-  last_7_days_eggs: number;
-  last_7_days_trays: number;
   labour_due_total?: number;
   flock_mortality_total?: number;
   flock_birds_added_total?: number;
   flock_birds_removed_total?: number;
+};
+
+export type ProfitSummaryOut = {
+  period_start: string;
+  period_end: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  cost_per_egg: number | null;
+  usable_eggs_in_period?: number;
 };
 
 export type FarmLabourRow = {
@@ -180,6 +198,7 @@ export type FarmLabourRow = {
   is_active: boolean;
   hired_at: string;
   balance_due: number;
+  linked_user_id?: number | null;
   created_at: string;
 };
 
@@ -214,12 +233,8 @@ export type FlockEventRow = {
   created_at: string;
 };
 
-export type ProfitSummary = {
-  revenue: number;
-  expenses: number;
-  profit: number;
-  cost_per_egg: number | null;
-};
+/** @deprecated use ProfitSummaryOut */
+export type ProfitSummary = ProfitSummaryOut;
 
 export type AuditLogRow = {
   id: number;

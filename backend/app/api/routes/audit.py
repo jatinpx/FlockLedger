@@ -1,8 +1,10 @@
 import json
+from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.api.analytics_params import list_optional_date_range
 from app.api.farm_access import require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
@@ -22,15 +24,27 @@ def list_farm_audit_logs(
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    dr: tuple = Depends(list_optional_date_range),
 ):
     """Owners and managers can review mutation history for accountability."""
     require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    start_date, end_date = dr
     q = (
         db.query(AuditLog, User.name, User.email)
         .join(User, User.id == AuditLog.user_id)
         .filter(AuditLog.farm_id == farm_id)
-        .order_by(AuditLog.id.desc())
     )
+    if start_date is not None:
+        q = q.filter(
+            AuditLog.created_at
+            >= datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+        )
+    if end_date is not None:
+        q = q.filter(
+            AuditLog.created_at
+            <= datetime.combine(end_date, time(23, 59, 59, 999999), tzinfo=timezone.utc)
+        )
+    q = q.order_by(AuditLog.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     out: list[AuditLogRowOut] = []

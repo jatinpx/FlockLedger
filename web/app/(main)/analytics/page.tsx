@@ -4,9 +4,14 @@ import { useEffect, useState } from "react";
 import { EggProductionChart } from "@/components/EggProductionChart";
 import { FeedUsageChart } from "@/components/FeedUsageChart";
 import { ProfitCard } from "@/components/ProfitCard";
+import { ReportingPeriodControls } from "@/components/ReportingPeriodControls";
 import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
-import { apiFetch, type Paginated } from "@/lib/api";
+import {
+  apiFetch,
+  type Paginated,
+  type ProfitSummaryOut,
+} from "@/lib/api";
 import { toastError } from "@/lib/toast";
 import { useChartPalette } from "@/lib/theme-context";
 import { withPagination } from "@/components/PaginationFooter";
@@ -20,32 +25,42 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  buildSeriesQuery,
+  buildSummaryQuery,
+  type Granularity,
+  type SummaryPeriodInput,
+} from "@/lib/reporting-query";
 
-type EggPoint = { date: string; usable_eggs: number; trays: number };
+const CHART_PAGE = 500;
+
+const DEFAULT_PERIOD: SummaryPeriodInput = { kind: "days", days: 30 };
+
+type EggPoint = {
+  date: string;
+  period_label?: string;
+  usable_eggs: number;
+  trays: number;
+};
 type FeedPoint = {
   date: string;
+  period_label?: string;
   feed_received: number;
   feed_used: number;
   feed_remaining: number;
 };
 
-/** Large page size so charts get full series; API still paginates. */
-const CHART_PAGE = 500;
-
 export default function AnalyticsPage() {
   const pal = useChartPalette();
   const { farmId } = useFarm();
   const runLoaded = useAsyncLoader();
+  const [period, setPeriod] = useState<SummaryPeriodInput>(DEFAULT_PERIOD);
+  const [granularity, setGranularity] = useState<Granularity>("day");
   const [eggs, setEggs] = useState<EggPoint[]>([]);
   const [feed, setFeed] = useState<FeedPoint[]>([]);
-  const [profit, setProfit] = useState<{
-    revenue: number;
-    expenses: number;
-    profit: number;
-    cost_per_egg: number | null;
-  } | null>(null);
+  const [profit, setProfit] = useState<ProfitSummaryOut | null>(null);
   const [dailyProfit, setDailyProfit] = useState<
-    { date: string; revenue: number; expenses: number; profit: number }[]
+    { date: string; period_label?: string; revenue: number; expenses: number; profit: number }[]
   >([]);
   const [mlEgg, setMlEgg] = useState<unknown>(null);
   const [mlFeed, setMlFeed] = useState<unknown>(null);
@@ -56,6 +71,8 @@ export default function AnalyticsPage() {
     if (!farmId) return;
     let cancelled = false;
     setLoadFailed(false);
+    const sumQs = buildSummaryQuery(period);
+    const seriesQs = buildSeriesQuery(period, granularity);
     (async () => {
       try {
         await runLoaded(async () => {
@@ -63,13 +80,14 @@ export default function AnalyticsPage() {
             apiFetch<
               Paginated<{
                 date: string;
+                period_label: string;
                 usable_eggs: number;
                 broken_eggs: number;
                 trays: number;
               }>
             >(
               withPagination(
-                `/farms/${farmId}/analytics/eggs/daily?days=14`,
+                `/farms/${farmId}/analytics/eggs/daily?${seriesQs}`,
                 CHART_PAGE,
                 0
               )
@@ -77,33 +95,30 @@ export default function AnalyticsPage() {
             apiFetch<
               Paginated<{
                 date: string;
+                period_label: string;
                 feed_received: number;
                 feed_used: number;
                 feed_remaining: number;
               }>
             >(
               withPagination(
-                `/farms/${farmId}/analytics/feed/daily?days=14`,
+                `/farms/${farmId}/analytics/feed/daily?${seriesQs}`,
                 CHART_PAGE,
                 0
               )
             ),
-            apiFetch<{
-              revenue: number;
-              expenses: number;
-              profit: number;
-              cost_per_egg: number | null;
-            }>(`/farms/${farmId}/analytics/profit?days=30`),
+            apiFetch<ProfitSummaryOut>(`/farms/${farmId}/analytics/profit?${sumQs}`),
             apiFetch<
               Paginated<{
                 date: string;
+                period_label: string;
                 revenue: number;
                 expenses: number;
                 profit: number;
               }>
             >(
               withPagination(
-                `/farms/${farmId}/analytics/profit/daily?days=30`,
+                `/farms/${farmId}/analytics/profit/daily?${seriesQs}`,
                 CHART_PAGE,
                 0
               )
@@ -115,6 +130,7 @@ export default function AnalyticsPage() {
             setEggs(
               e.items.map((row) => ({
                 date: row.date,
+                period_label: row.period_label,
                 usable_eggs: row.usable_eggs,
                 trays: row.trays,
               }))
@@ -122,6 +138,7 @@ export default function AnalyticsPage() {
             setFeed(
               f.items.map((row) => ({
                 date: row.date,
+                period_label: row.period_label,
                 feed_received: row.feed_received,
                 feed_used: row.feed_used,
                 feed_remaining: row.feed_remaining,
@@ -143,7 +160,7 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, retryTick]);
+  }, [farmId, retryTick, period, granularity]);
 
   if (!farmId) {
     return <p className="text-zinc-500 dark:text-zinc-400">Select a farm first.</p>;
@@ -170,12 +187,41 @@ export default function AnalyticsPage() {
 
   const profitChartData = dailyProfit.map((d) => ({
     ...d,
-    label: d.date.slice(5),
+    label: d.period_label ?? d.date.slice(5),
   }));
+
+  const granLabel =
+    granularity === "day"
+      ? "daily"
+      : granularity === "week"
+        ? "weekly"
+        : granularity === "month"
+          ? "monthly"
+          : granularity === "quarter"
+            ? "quarterly"
+            : granularity === "half_year"
+              ? "half-yearly"
+              : "yearly";
 
   return (
     <div className="space-y-8">
-      {profit && <ProfitCard {...profit} />}
+      <ReportingPeriodControls
+        period={period}
+        onPeriodChange={setPeriod}
+        showGranularity
+        granularity={granularity}
+        onGranularityChange={setGranularity}
+      />
+
+      {profit && (
+        <ProfitCard
+          revenue={profit.revenue}
+          expenses={profit.expenses}
+          profit={profit.profit}
+          cost_per_egg={profit.cost_per_egg}
+          periodLabel={`${profit.period_start} → ${profit.period_end}`}
+        />
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <EggProductionChart data={eggs} />
@@ -183,7 +229,9 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="h-80 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">Daily profit (30d)</h3>
+        <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+          Profit ({granLabel} buckets)
+        </h3>
         <ResponsiveContainer width="100%" height="90%">
           <LineChart data={profitChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />

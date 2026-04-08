@@ -25,6 +25,7 @@ export function LabourScreen() {
   const { farms, farmId } = useFarm();
   const current = farms.find((f) => f.id === farmId);
   const canManage = current?.my_role === "owner" || current?.my_role === "manager";
+  const isWorker = current?.my_role === "worker";
 
   const [rows, setRows] = useState<FarmLabourRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -93,6 +94,13 @@ export function LabourScreen() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (canManage || !isWorker) return;
+    if (rows.length === 1 && selectedId == null) {
+      setSelectedId(rows[0].id);
+    }
+  }, [canManage, isWorker, rows, selectedId]);
 
   useEffect(() => {
     setLedgerOffset(0);
@@ -199,12 +207,17 @@ export function LabourScreen() {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
     >
-      <View style={styles.callout}>
-        <Text style={styles.calloutText}>
-          Positive balance = farm owes them. Earning adds debt; payment reduces it. Adjustment can be
-          + or − for corrections.
+      <View style={[styles.callout, isWorker && styles.calloutWorker]}>
+        <Text style={[styles.calloutText, isWorker && styles.calloutTextWorker]}>
+          {isWorker
+            ? "This is your pay balance and ledger for this farm. If nothing appears, ask a manager to link your app login to your labour record."
+            : "Positive balance = farm owes them. Earning adds debt; payment reduces it. Adjustment can be + or − for corrections."}
         </Text>
       </View>
+
+      {isWorker && rows.length === 0 ? (
+        <Text style={styles.mutedSm}>No labour record is linked to your account for this farm yet.</Text>
+      ) : null}
 
       {canManage ? (
         <View style={styles.card}>
@@ -261,7 +274,7 @@ export function LabourScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.h2}>People</Text>
+      <Text style={styles.h2}>{isWorker ? "Your record" : "People"}</Text>
       {loading && !rows.length ? <ActivityIndicator color="#047857" style={{ marginVertical: 16 }} /> : null}
       {rows.map((r) => (
         <Pressable
@@ -342,7 +355,11 @@ export function LabourScreen() {
               </Pressable>
             </>
           ) : (
-            <Text style={styles.mutedSm}>Managers can post ledger lines.</Text>
+            <Text style={styles.mutedSm}>
+              {isWorker
+                ? "Your earnings and payments are listed below."
+                : "Managers can post ledger lines."}
+            </Text>
           )}
 
           {ledgerRows.map((L) => (
@@ -386,6 +403,11 @@ const styles = StyleSheet.create({
     borderColor: "#fde68a",
   },
   calloutText: { fontSize: 12, color: "#78350f" },
+  calloutWorker: {
+    backgroundColor: "#f4f4f5",
+    borderColor: "#e4e4e7",
+  },
+  calloutTextWorker: { color: "#3f3f46" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,

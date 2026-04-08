@@ -14,13 +14,16 @@ import {
   getApiBase,
   getToken,
   type DashboardSummary,
-  type ProfitSummary,
+  type ProfitSummaryOut,
 } from "../lib/api";
+
+const PERIOD_OPTIONS = [7, 30, 90, 180, 365] as const;
 
 export function DashboardScreen() {
   const { farmId } = useFarm();
+  const [periodDays, setPeriodDays] = useState<number>(30);
   const [data, setData] = useState<DashboardSummary | null>(null);
-  const [profit, setProfit] = useState<ProfitSummary | null>(null);
+  const [profit, setProfit] = useState<ProfitSummaryOut | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -35,9 +38,10 @@ export function DashboardScreen() {
     setLoading(true);
     (async () => {
       try {
+        const qs = `days=${periodDays}`;
         const [dash, p] = await Promise.all([
-          apiFetch<DashboardSummary>(`/farms/${farmId}/analytics/dashboard`),
-          apiFetch<ProfitSummary>(`/farms/${farmId}/analytics/profit?days=30`),
+          apiFetch<DashboardSummary>(`/farms/${farmId}/analytics/dashboard?${qs}`),
+          apiFetch<ProfitSummaryOut>(`/farms/${farmId}/analytics/profit?${qs}`),
         ]);
         if (!cancelled) {
           setData(dash);
@@ -52,7 +56,7 @@ export function DashboardScreen() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, retryTick]);
+  }, [farmId, retryTick, periodDays]);
 
   useEffect(() => {
     if (!farmId) return;
@@ -129,18 +133,36 @@ export function DashboardScreen() {
         </View>
       ) : null}
 
+      <Text style={styles.periodHint}>Dashboard period (tap to change)</Text>
+      <View style={styles.periodRow}>
+        {PERIOD_OPTIONS.map((d) => (
+          <Pressable
+            key={d}
+            style={[styles.periodChip, periodDays === d && styles.periodChipOn]}
+            onPress={() => setPeriodDays(d)}
+          >
+            <Text style={[styles.periodChipText, periodDays === d && styles.periodChipTextOn]}>
+              {d === 365 ? "1y" : d === 180 ? "6m" : `${d}d`}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       <View style={styles.grid}>
         <View style={styles.tile}>
           <Text style={styles.tileLabel}>Birds</Text>
           <Text style={styles.tileVal}>{data.total_birds.toLocaleString()}</Text>
         </View>
         <View style={styles.tile}>
-          <Text style={styles.tileLabel}>7d usable eggs</Text>
-          <Text style={styles.tileVal}>{data.last_7_days_eggs.toLocaleString()}</Text>
+          <Text style={styles.tileLabel}>Period eggs</Text>
+          <Text style={styles.tileVal}>{data.period_usable_eggs.toLocaleString()}</Text>
+          <Text style={styles.tileSub}>
+            {data.period_start} → {data.period_end}
+          </Text>
         </View>
         <View style={styles.tile}>
-          <Text style={styles.tileLabel}>7d trays (equiv.)</Text>
-          <Text style={styles.tileVal}>{data.last_7_days_trays.toLocaleString()}</Text>
+          <Text style={styles.tileLabel}>Period trays</Text>
+          <Text style={styles.tileVal}>{data.period_trays.toLocaleString()}</Text>
         </View>
         <View style={styles.tileWide}>
           <Text style={styles.tileLabel}>Tray stock (derived)</Text>
@@ -172,7 +194,9 @@ export function DashboardScreen() {
 
       {profit ? (
         <View style={styles.card}>
-          <Text style={styles.h2}>Last 30 days</Text>
+          <Text style={styles.h2}>
+            Profit {profit.period_start} → {profit.period_end}
+          </Text>
           <View style={styles.profitRow}>
             <View style={styles.profitCol}>
               <Text style={styles.profitLabel}>Revenue</Text>
@@ -215,6 +239,19 @@ export function DashboardScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
+  periodHint: { fontSize: 12, color: "#71717a", marginBottom: 8 },
+  periodRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  periodChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e4e4e7",
+    backgroundColor: "#fff",
+  },
+  periodChipOn: { backgroundColor: "#ecfdf5", borderColor: "#6ee7b7" },
+  periodChipText: { fontSize: 13, fontWeight: "600", color: "#3f3f46" },
+  periodChipTextOn: { color: "#065f46" },
   center: { padding: 48, alignItems: "center" },
   muted: { padding: 16, color: "#71717a" },
   live: {

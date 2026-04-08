@@ -25,6 +25,7 @@ from app.api.routes import (
     sales,
     websocket,
 )
+from app.constants.expense_categories import EXPENSE_CATEGORIES
 from app.core.config import settings
 from app.migrations_runner import run_migrations_if_enabled
 
@@ -63,3 +64,9 @@ app.include_router(websocket.router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/expense-categories")
+def expense_categories():
+    """Predefined expense category labels for farm operations (UI dropdowns)."""
+    return list(EXPENSE_CATEGORIES)

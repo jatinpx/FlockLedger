@@ -5,12 +5,14 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.farm_access import require_farm_member
+from app.api.farm_access import require_farm_role
 from app.database import get_db
 from app.deps import CurrentUser
 from app.ml.predict import load_model_bundle, predict_egg_week, predict_feed_days
 
 router = APIRouter(prefix="/farms/{farm_id}/ml", tags=["ml"])
+
+MANAGER_ROLES = ("owner", "manager")
 
 MODEL_DIR = Path(__file__).resolve().parents[3] / "ml_artifacts"
 
@@ -21,7 +23,7 @@ def predict_eggs(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ):
-    require_farm_member(db, user.id, farm_id)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     bundle = load_model_bundle(MODEL_DIR / "egg_model.joblib")
     if bundle is None:
         return {
@@ -40,7 +42,7 @@ def predict_feed(
     db: Session = Depends(get_db),
     days: int = Query(30, ge=1, le=90),
 ):
-    require_farm_member(db, user.id, farm_id)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     bundle = load_model_bundle(MODEL_DIR / "feed_model.joblib")
     if bundle is None:
         return {

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.farm_access import get_shed_for_farm, require_farm_member, require_farm_role
+from app.api.analytics_params import list_optional_date_range
+from app.api.farm_access import get_shed_for_farm, require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
@@ -21,7 +22,6 @@ from app.services.redis_events import publish_farm_event
 router = APIRouter(prefix="/farms/{farm_id}/flock", tags=["flock"])
 
 MANAGER_ROLES = ("owner", "manager")
-WORKER_OK = ("owner", "manager", "worker")
 
 
 def _to_out(row: FlockEvent) -> FlockEventOut:
@@ -43,7 +43,7 @@ def _to_out(row: FlockEvent) -> FlockEventOut:
 
 @router.get("/summary", response_model=FlockSummary)
 def flock_summary(farm_id: int, user: CurrentUser, db: Session = Depends(get_db)):
-    require_farm_member(db, user.id, farm_id)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     sheds = db.query(Shed).filter(Shed.farm_id == farm_id).order_by(Shed.name.asc()).all()
     by_kind = flock_kind_totals(db, farm_id)
     return FlockSummary(
@@ -61,7 +61,7 @@ def create_flock_event(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     shed = get_shed_for_farm(db, body.shed_id, farm_id)
     store_qty = body.quantity if body.event_kind == "count_adjust" else abs(body.quantity)
     try:
@@ -114,13 +114,16 @@ def list_flock_events(
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    dr: tuple = Depends(list_optional_date_range),
 ):
-    require_farm_member(db, user.id, farm_id)
-    q = (
-        db.query(FlockEvent)
-        .filter(FlockEvent.farm_id == farm_id)
-        .order_by(FlockEvent.event_date.desc(), FlockEvent.id.desc())
-    )
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    start_date, end_date = dr
+    q = db.query(FlockEvent).filter(FlockEvent.farm_id == farm_id)
+    if start_date is not None:
+        q = q.filter(FlockEvent.event_date >= start_date)
+    if end_date is not None:
+        q = q.filter(FlockEvent.event_date <= end_date)
+    q = q.order_by(FlockEvent.event_date.desc(), FlockEvent.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     items = [_to_out(r) for r in rows]

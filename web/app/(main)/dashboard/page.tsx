@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FarmSummary } from "@/components/FarmSummary";
 import { ProfitCard } from "@/components/ProfitCard";
+import { ReportingPeriodControls } from "@/components/ReportingPeriodControls";
 import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
 import {
@@ -10,19 +11,19 @@ import {
   getApiBase,
   getToken,
   type DashboardSummary,
+  type ProfitSummaryOut,
 } from "@/lib/api";
 import { toastError } from "@/lib/toast";
+import { buildSummaryQuery, type SummaryPeriodInput } from "@/lib/reporting-query";
+
+const DEFAULT_PERIOD: SummaryPeriodInput = { kind: "days", days: 30 };
 
 export default function DashboardPage() {
   const { farmId } = useFarm();
   const runLoaded = useAsyncLoader();
+  const [period, setPeriod] = useState<SummaryPeriodInput>(DEFAULT_PERIOD);
   const [data, setData] = useState<DashboardSummary | null>(null);
-  const [profit, setProfit] = useState<{
-    revenue: number;
-    expenses: number;
-    profit: number;
-    cost_per_egg: number | null;
-  } | null>(null);
+  const [profit, setProfit] = useState<ProfitSummaryOut | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const [live, setLive] = useState<string | null>(null);
@@ -33,17 +34,13 @@ export default function DashboardPage() {
     setData(null);
     setProfit(null);
     setLoadFailed(false);
+    const qs = buildSummaryQuery(period);
     (async () => {
       try {
         await runLoaded(async () => {
           const [dash, p] = await Promise.all([
-            apiFetch<DashboardSummary>(`/farms/${farmId}/analytics/dashboard`),
-            apiFetch<{
-              revenue: number;
-              expenses: number;
-              profit: number;
-              cost_per_egg: number | null;
-            }>(`/farms/${farmId}/analytics/profit?days=30`),
+            apiFetch<DashboardSummary>(`/farms/${farmId}/analytics/dashboard?${qs}`),
+            apiFetch<ProfitSummaryOut>(`/farms/${farmId}/analytics/profit?${qs}`),
           ]);
           if (!cancelled) {
             setData(dash);
@@ -60,7 +57,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, retryTick]);
+  }, [farmId, retryTick, period]);
 
   useEffect(() => {
     if (!farmId || typeof window === "undefined") return;
@@ -112,13 +109,23 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <ReportingPeriodControls period={period} onPeriodChange={setPeriod} />
+
       {live && (
         <p className="rounded-md border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-400">
           Live: {live}
         </p>
       )}
       <FarmSummary data={data} />
-      {profit && <ProfitCard {...profit} />}
+      {profit && (
+        <ProfitCard
+          revenue={profit.revenue}
+          expenses={profit.expenses}
+          profit={profit.profit}
+          cost_per_egg={profit.cost_per_egg}
+          periodLabel={`${profit.period_start} → ${profit.period_end}`}
+        />
+      )}
     </div>
   );
 }

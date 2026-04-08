@@ -9,10 +9,17 @@ import {
   Pressable,
 } from "react-native";
 import { useFarm } from "../lib/farm-context";
-import { apiFetch, type Paginated } from "../lib/api";
+import { apiFetch, type Paginated, type ProfitSummaryOut } from "../lib/api";
 import { withPagination } from "../lib/pagination";
+import {
+  buildSeriesQuery,
+  buildSummaryQuery,
+  GRANULARITY_OPTIONS,
+  type Granularity,
+} from "../lib/reporting-query";
 
 const CHART_PAGE = 500;
+const PERIOD_DAYS = [7, 14, 30, 90, 180, 365] as const;
 
 const fmtInr = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
@@ -20,20 +27,23 @@ const fmtInr = (n: number) =>
 /** Same data as web analytics; charts replaced with scrollable lists + JSON for ML. */
 export function AnalyticsScreen() {
   const { farmId } = useFarm();
-  const [profit, setProfit] = useState<{
-    revenue: number;
-    expenses: number;
-    profit: number;
-    cost_per_egg: number | null;
-  } | null>(null);
+  const [periodDays, setPeriodDays] = useState<number>(30);
+  const [granularity, setGranularity] = useState<Granularity>("day");
+  const [profit, setProfit] = useState<ProfitSummaryOut | null>(null);
   const [eggs, setEggs] = useState<
-    { date: string; usable_eggs: number; trays: number }[]
+    { period_label: string; date: string; usable_eggs: number; trays: number }[]
   >([]);
   const [feed, setFeed] = useState<
-    { date: string; feed_received: number; feed_used: number; feed_remaining: number }[]
+    {
+      period_label: string;
+      date: string;
+      feed_received: number;
+      feed_used: number;
+      feed_remaining: number;
+    }[]
   >([]);
   const [dailyProfit, setDailyProfit] = useState<
-    { date: string; revenue: number; expenses: number; profit: number }[]
+    { period_label: string; date: string; revenue: number; expenses: number; profit: number }[]
   >([]);
   const [mlEgg, setMlEgg] = useState<unknown>(null);
   const [mlFeed, setMlFeed] = useState<unknown>(null);
@@ -48,36 +58,53 @@ export function AnalyticsScreen() {
     setLoading(true);
     (async () => {
       try {
+        const period = { kind: "days" as const, days: periodDays };
+        const sumQs = buildSummaryQuery(period);
+        const seriesQs = buildSeriesQuery(period, granularity);
         const [e, f, p, d, me, mf] = await Promise.all([
           apiFetch<
-            Paginated<{ date: string; usable_eggs: number; broken_eggs: number; trays: number }>
-          >(withPagination(`/farms/${farmId}/analytics/eggs/daily?days=14`, CHART_PAGE, 0)),
+            Paginated<{
+              period_label: string;
+              date: string;
+              usable_eggs: number;
+              broken_eggs: number;
+              trays: number;
+            }>
+          >(withPagination(`/farms/${farmId}/analytics/eggs/daily?${seriesQs}`, CHART_PAGE, 0)),
           apiFetch<
             Paginated<{
+              period_label: string;
               date: string;
               feed_received: number;
               feed_used: number;
               feed_remaining: number;
             }>
-          >(withPagination(`/farms/${farmId}/analytics/feed/daily?days=14`, CHART_PAGE, 0)),
-          apiFetch<{
-            revenue: number;
-            expenses: number;
-            profit: number;
-            cost_per_egg: number | null;
-          }>(`/farms/${farmId}/analytics/profit?days=30`),
+          >(withPagination(`/farms/${farmId}/analytics/feed/daily?${seriesQs}`, CHART_PAGE, 0)),
+          apiFetch<ProfitSummaryOut>(`/farms/${farmId}/analytics/profit?${sumQs}`),
           apiFetch<
-            Paginated<{ date: string; revenue: number; expenses: number; profit: number }>
-          >(
-            withPagination(`/farms/${farmId}/analytics/profit/daily?days=30`, CHART_PAGE, 0)
-          ),
+            Paginated<{
+              period_label: string;
+              date: string;
+              revenue: number;
+              expenses: number;
+              profit: number;
+            }>
+          >(withPagination(`/farms/${farmId}/analytics/profit/daily?${seriesQs}`, CHART_PAGE, 0)),
           apiFetch(`/farms/${farmId}/ml/predict/eggs-next-week`),
           apiFetch(`/farms/${farmId}/ml/predict/feed-next-days?days=30`),
         ]);
         if (!cancelled) {
-          setEggs(e.items.map((row) => ({ date: row.date, usable_eggs: row.usable_eggs, trays: row.trays })));
+          setEggs(
+            e.items.map((row) => ({
+              period_label: row.period_label,
+              date: row.date,
+              usable_eggs: row.usable_eggs,
+              trays: row.trays,
+            }))
+          );
           setFeed(
             f.items.map((row) => ({
+              period_label: row.period_label,
               date: row.date,
               feed_received: row.feed_received,
               feed_used: row.feed_used,
@@ -85,7 +112,15 @@ export function AnalyticsScreen() {
             }))
           );
           setProfit(p);
-          setDailyProfit(d.items);
+          setDailyProfit(
+            d.items.map((row) => ({
+              period_label: row.period_label,
+              date: row.date,
+              revenue: row.revenue,
+              expenses: row.expenses,
+              profit: row.profit,
+            }))
+          );
           setMlEgg(me);
           setMlFeed(mf);
         }
@@ -98,7 +133,7 @@ export function AnalyticsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, tick]);
+  }, [farmId, tick, periodDays, granularity]);
 
   if (!farmId) {
     return <Text style={styles.muted}>Select or create a farm in Settings.</Text>;
@@ -129,9 +164,40 @@ export function AnalyticsScreen() {
         </View>
       ) : null}
 
+      <Text style={styles.hint}>Period (days)</Text>
+      <View style={styles.chipRow}>
+        {PERIOD_DAYS.map((d) => (
+          <Pressable
+            key={d}
+            style={[styles.chip, periodDays === d && styles.chipOn]}
+            onPress={() => setPeriodDays(d)}
+          >
+            <Text style={[styles.chipText, periodDays === d && styles.chipTextOn]}>
+              {d === 365 ? "1y" : d === 180 ? "6m" : d === 90 ? "90d" : `${d}d`}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.hint}>Bucket</Text>
+      <View style={styles.chipRow}>
+        {GRANULARITY_OPTIONS.map((g) => (
+          <Pressable
+            key={g.value}
+            style={[styles.chipSm, granularity === g.value && styles.chipOn]}
+            onPress={() => setGranularity(g.value)}
+          >
+            <Text style={[styles.chipTextSm, granularity === g.value && styles.chipTextOn]}>
+              {g.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {profit ? (
         <View style={styles.card}>
-          <Text style={styles.h2}>Last 30 days</Text>
+          <Text style={styles.h2}>
+            Profit summary {profit.period_start} → {profit.period_end}
+          </Text>
           <Text style={styles.line}>Revenue: {fmtInr(profit.revenue)}</Text>
           <Text style={styles.line}>Expenses: {fmtInr(profit.expenses)}</Text>
           <Text style={styles.profitLine}>Profit: {fmtInr(profit.profit)}</Text>
@@ -141,20 +207,20 @@ export function AnalyticsScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.h2}>Eggs (14d daily)</Text>
+      <Text style={styles.h2}>Eggs</Text>
       {eggs.map((row) => (
         <View key={row.date} style={styles.row}>
-          <Text style={styles.rowMain}>{row.date}</Text>
+          <Text style={styles.rowMain}>{row.period_label || row.date}</Text>
           <Text style={styles.rowSub}>
             {row.usable_eggs} usable eggs · {row.trays} trays
           </Text>
         </View>
       ))}
 
-      <Text style={styles.h2}>Feed (14d daily)</Text>
+      <Text style={styles.h2}>Feed</Text>
       {feed.map((row) => (
         <View key={row.date} style={styles.row}>
-          <Text style={styles.rowMain}>{row.date}</Text>
+          <Text style={styles.rowMain}>{row.period_label || row.date}</Text>
           <Text style={styles.rowSub}>
             In {row.feed_received.toFixed(2)} · Used {row.feed_used.toFixed(2)} · Rem{" "}
             {row.feed_remaining.toFixed(2)} kg
@@ -162,10 +228,10 @@ export function AnalyticsScreen() {
         </View>
       ))}
 
-      <Text style={styles.h2}>Daily profit (30d)</Text>
+      <Text style={styles.h2}>Profit by bucket</Text>
       {dailyProfit.map((row) => (
         <View key={row.date} style={styles.row}>
-          <Text style={styles.rowMain}>{row.date}</Text>
+          <Text style={styles.rowMain}>{row.period_label || row.date}</Text>
           <Text style={styles.rowSub}>
             P/L {fmtInr(row.profit)} · Rev {fmtInr(row.revenue)} · Exp {fmtInr(row.expenses)}
           </Text>
@@ -192,6 +258,28 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
   },
+  hint: { fontSize: 12, color: "#71717a", marginTop: 8, marginBottom: 6 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e4e4e7",
+    backgroundColor: "#fff",
+  },
+  chipSm: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e4e4e7",
+    backgroundColor: "#fff",
+  },
+  chipOn: { backgroundColor: "#ecfdf5", borderColor: "#6ee7b7" },
+  chipText: { fontSize: 13, fontWeight: "600", color: "#3f3f46" },
+  chipTextSm: { fontSize: 11, fontWeight: "600", color: "#3f3f46" },
+  chipTextOn: { color: "#065f46" },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginTop: 16, marginBottom: 10 },
   line: { fontSize: 15, color: "#3f3f46", marginTop: 6 },
   profitLine: { fontSize: 16, fontWeight: "700", color: "#047857", marginTop: 8 },

@@ -322,7 +322,7 @@ def main() -> int:
                     f"{base}/farms/{farm_id}/expenses",
                     token=mgr_tok,
                     json={
-                        "category": "Feed purchase",
+                        "category": "Feed & fodder",
                         "amount": bill,
                         "description": f"Bulk feed delivery ~{recv:.0f} kg (sim)",
                         "date": d.isoformat(),
@@ -367,7 +367,7 @@ def main() -> int:
                     f"{base}/farms/{farm_id}/expenses",
                     token=mgr_tok,
                     json={
-                        "category": "Electricity",
+                        "category": "Utilities",
                         "amount": float(rng.randint(4200, 7800)),
                         "description": "Cooling + lighting + pumps (sim week)",
                         "date": d.isoformat(),
@@ -380,7 +380,7 @@ def main() -> int:
                     f"{base}/farms/{farm_id}/expenses",
                     token=mgr_tok,
                     json={
-                        "category": "Diesel",
+                        "category": "Fuel & transport",
                         "amount": float(rng.randint(1800, 6500)),
                         "description": "Genset / transport fuel (sim)",
                         "date": d.isoformat(),
@@ -510,7 +510,8 @@ def main() -> int:
         print("\n=== Dashboard (owner1) ===", flush=True)
         print(
             f"total_birds={dash['total_birds']}  tray_stock={dash['tray_stock']}  "
-            f"last_7d_eggs={dash['last_7_days_eggs']}  last_7d_trays={dash['last_7_days_trays']}  "
+            f"period={dash['period_start']}..{dash['period_end']}  "
+            f"period_eggs={dash['period_usable_eggs']}  period_trays={dash['period_trays']}  "
             f"labour_due={dash['labour_due_total']}",
             flush=True,
         )

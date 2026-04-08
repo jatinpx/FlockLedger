@@ -3,7 +3,8 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.farm_access import require_farm_member, require_farm_role
+from app.api.analytics_params import list_optional_date_range
+from app.api.farm_access import require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
@@ -17,7 +18,6 @@ from app.services.redis_events import publish_farm_event
 router = APIRouter(prefix="/farms/{farm_id}/sales", tags=["sales"])
 
 MANAGER_ROLES = ("owner", "manager")
-WORKER_OK = ("owner", "manager", "worker")
 
 
 def _to_out(s: Sale) -> SaleOut:
@@ -53,7 +53,7 @@ def create_sale(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     expected = Decimal(str(body.trays_sold)) * Decimal(str(body.rate_per_tray))
     if abs(expected - Decimal(str(body.total_amount))) > Decimal("0.02"):
         raise HTTPException(
@@ -96,7 +96,7 @@ def patch_sale(
     ip: ClientIp,
     db: Session = Depends(get_db),
 ):
-    require_farm_role(db, user.id, farm_id, *WORKER_OK)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     row = db.query(Sale).filter(Sale.id == sale_id, Sale.farm_id == farm_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
@@ -157,13 +157,16 @@ def list_sales(
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    dr: tuple = Depends(list_optional_date_range),
 ):
-    require_farm_member(db, user.id, farm_id)
-    q = (
-        db.query(Sale)
-        .filter(Sale.farm_id == farm_id)
-        .order_by(Sale.date.desc(), Sale.id.desc())
-    )
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    start_date, end_date = dr
+    q = db.query(Sale).filter(Sale.farm_id == farm_id)
+    if start_date is not None:
+        q = q.filter(Sale.date >= start_date)
+    if end_date is not None:
+        q = q.filter(Sale.date <= end_date)
+    q = q.order_by(Sale.date.desc(), Sale.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
     items = [_to_out(r) for r in rows]

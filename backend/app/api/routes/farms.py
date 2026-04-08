@@ -214,7 +214,7 @@ def list_sheds(
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
 ):
-    require_farm_member(db, user.id, farm_id)
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     q = db.query(Shed).filter(Shed.farm_id == farm_id).order_by(Shed.id)
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()

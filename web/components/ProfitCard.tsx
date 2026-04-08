@@ -3,6 +3,7 @@ export function ProfitCard(props: {
   expenses: number;
   profit: number;
   cost_per_egg: number | null;
+  periodLabel?: string;
 }) {
   const fmt = (n: number) =>
     new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(
@@ -10,7 +11,9 @@ export function ProfitCard(props: {
     );
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Last 30 days</h2>
+      <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        {props.periodLabel ?? "Profit summary"}
+      </h2>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <div>
           <p className="text-xs uppercase text-zinc-500 dark:text-zinc-400">Revenue</p>
