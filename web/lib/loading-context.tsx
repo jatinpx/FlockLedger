@@ -5,53 +5,67 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
-type LoadingCtx = {
+type LoadingActions = {
   pushLoad: () => void;
   popLoad: () => void;
-  loading: boolean;
 };
 
-const LoadingContext = createContext<LoadingCtx | null>(null);
+/** Stable across loading toggles — useAsyncLoader subscribers do not re-render on each fetch. */
+const LoadingActionsContext = createContext<LoadingActions | null>(null);
+const LoadingStateContext = createContext<boolean | null>(null);
 
 export function LoadingProvider({ children }: { children: ReactNode }) {
   const [depth, setDepth] = useState(0);
   const pushLoad = useCallback(() => setDepth((d) => d + 1), []);
   const popLoad = useCallback(() => setDepth((d) => Math.max(0, d - 1)), []);
-  const value = useMemo(
-    () => ({
-      pushLoad,
-      popLoad,
-      loading: depth > 0,
-    }),
-    [depth, pushLoad, popLoad]
+
+  const actions = useMemo(
+    () => ({ pushLoad, popLoad }),
+    [pushLoad, popLoad],
   );
+
+  const loading = depth > 0;
+
   return (
-    <LoadingContext.Provider value={value}>{children}</LoadingContext.Provider>
+    <LoadingActionsContext.Provider value={actions}>
+      <LoadingStateContext.Provider value={loading}>
+        {children}
+      </LoadingStateContext.Provider>
+    </LoadingActionsContext.Provider>
   );
 }
 
 export function usePageLoading() {
-  const ctx = useContext(LoadingContext);
-  if (!ctx) throw new Error("usePageLoading requires LoadingProvider");
-  return ctx;
+  const loading = useContext(LoadingStateContext);
+  if (loading === null) {
+    throw new Error("usePageLoading requires LoadingProvider");
+  }
+  return { loading };
 }
 
-/** Run async work with global top loading bar (push/pop balanced). */
+/**
+ * Stable identity (empty deps) so list pages don't re-run data effects when only
+ * loading depth changes. Uses a ref to always call the latest push/pop.
+ */
 export function useAsyncLoader() {
-  const { pushLoad, popLoad } = usePageLoading();
-  return useCallback(
-    async <T,>(fn: () => Promise<T>): Promise<T> => {
-      pushLoad();
-      try {
-        return await fn();
-      } finally {
-        popLoad();
-      }
-    },
-    [pushLoad, popLoad]
-  );
+  const actions = useContext(LoadingActionsContext);
+  if (!actions) {
+    throw new Error("useAsyncLoader requires LoadingProvider");
+  }
+  const ref = useRef(actions);
+  ref.current = actions;
+  return useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
+    const { pushLoad, popLoad } = ref.current;
+    pushLoad();
+    try {
+      return await fn();
+    } finally {
+      popLoad();
+    }
+  }, []);
 }

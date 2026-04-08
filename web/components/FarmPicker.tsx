@@ -61,7 +61,7 @@ export function FarmPicker({
 
   return (
     <div className="relative" ref={wrapRef}>
-      <label className="mr-2 text-sm text-zinc-500" htmlFor="farm-picker-btn">
+      <label className="mr-2 text-sm text-zinc-500 dark:text-zinc-400" htmlFor="farm-picker-btn">
         Farm
       </label>
       <button
@@ -69,25 +69,25 @@ export function FarmPicker({
         type="button"
         disabled={loading || !farms.length}
         onClick={() => setOpen((o) => !o)}
-        className="min-w-[10rem] rounded-md border border-zinc-200 bg-white px-3 py-2 text-left text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+        className="min-w-[10rem] rounded-md border border-zinc-200 bg-white px-3 py-2 text-left text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
       >
         {current?.name ?? "Select farm"}
-        <span className="ml-2 text-xs font-normal text-zinc-500">
+        <span className="ml-2 text-xs font-normal text-zinc-500 dark:text-zinc-400">
           {current?.my_role ? `(${current.my_role})` : ""}
         </span>
       </button>
       {open && farms.length > 0 && (
-        <div className="absolute right-0 z-50 mt-1 max-h-80 w-72 overflow-auto rounded-md border border-zinc-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 z-50 mt-1 max-h-80 w-72 overflow-auto rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
           {farms.map((f) => (
             <div
               key={f.id}
               onMouseEnter={() => loadMembers(f.id, f.my_role)}
-              className="border-b border-zinc-100 last:border-0"
+              className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
             >
               <button
                 type="button"
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-zinc-50 ${
-                  f.id === farmId ? "bg-emerald-50 text-emerald-900" : ""
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+                  f.id === farmId ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200" : ""
                 }`}
                 onClick={() => {
                   setFarmId(f.id);
@@ -95,16 +95,16 @@ export function FarmPicker({
                 }}
               >
                 <span className="font-medium">{f.name}</span>
-                <span className="ml-2 text-xs text-zinc-500">{f.my_role}</span>
+                <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{f.my_role}</span>
               </button>
               {(f.my_role === "owner" || f.my_role === "manager") &&
                 membersByFarm[f.id] && (
-                  <div className="border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-                    <p className="mb-1 font-medium text-zinc-500">Members</p>
+                  <div className="border-t border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-300">
+                    <p className="mb-1 font-medium text-zinc-500 dark:text-zinc-400">Members</p>
                     {membersByFarm[f.id].map((m) => (
                       <div key={m.user_id}>
                         {m.name}{" "}
-                        <span className="text-emerald-800">({m.role})</span>
+                        <span className="text-emerald-800 dark:text-emerald-400">({m.role})</span>
                       </div>
                     ))}
                   </div>

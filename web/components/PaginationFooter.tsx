@@ -26,14 +26,14 @@ export function PaginationFooter({
 
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 bg-zinc-50/80 px-3 py-2 text-sm text-zinc-600 ${className}`}
+      className={`flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 bg-zinc-50/80 px-3 py-2 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400 ${className}`}
     >
       <span>
         {total === 0 ? (
           "No rows"
         ) : (
           <>
-            <span className="font-medium text-zinc-800">
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">
               {from}–{to}
             </span>{" "}
             of {total}
@@ -41,10 +41,10 @@ export function PaginationFooter({
         )}
       </span>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1 text-xs text-zinc-500">
+        <label className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
           Per page
           <select
-            className="rounded border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-800"
+            className="rounded border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             value={limit}
             onChange={(e) => onLimitChange(Number(e.target.value))}
           >
@@ -59,18 +59,18 @@ export function PaginationFooter({
           <button
             type="button"
             disabled={offset <= 0}
-            className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs disabled:opacity-40"
+            className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
             onClick={() => onOffsetChange(Math.max(0, offset - limit))}
           >
             Previous
           </button>
-          <span className="px-1 text-xs text-zinc-500">
+          <span className="px-1 text-xs text-zinc-500 dark:text-zinc-400">
             Page {currentPage} / {pages}
           </span>
           <button
             type="button"
             disabled={offset + limit >= total}
-            className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs disabled:opacity-40"
+            className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
             onClick={() => onOffsetChange(offset + limit)}
           >
             Next

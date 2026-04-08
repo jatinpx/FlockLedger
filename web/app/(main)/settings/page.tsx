@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { PaginationFooter, withPagination } from "@/components/PaginationFooter";
 import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
@@ -64,7 +64,7 @@ export default function SettingsPage() {
       setSheds(r.items);
       setShedTotal(r.total);
     });
-  }, [farmId, shedLimit, shedOffset, runLoaded]);
+  }, [farmId, shedLimit, shedOffset]);
 
   const loadMembers = useCallback(async () => {
     if (!farmId || !canManage) return;
@@ -75,15 +75,15 @@ export default function SettingsPage() {
       setMembers(r.items);
       setMemTotal(r.total);
     });
-  }, [farmId, canManage, memLimit, memOffset, runLoaded]);
+  }, [farmId, canManage, memLimit, memOffset]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setShedOffset(0);
   }, [shedLimit, farmId]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     setMemOffset(0);
   }, [memLimit, farmId]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     setSearchOffset(0);
   }, [searchLimit, userQuery, farmId]);
 
@@ -289,8 +289,8 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-10">
-      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-zinc-900">Create farm</h2>
+      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Create farm</h2>
         <form onSubmit={createFarm} className="mt-4 space-y-3">
           <input
             placeholder="Farm name"
@@ -314,35 +314,35 @@ export default function SettingsPage() {
         </form>
       </section>
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-zinc-900">Your farms</h2>
-        <ul className="mt-3 space-y-2 text-sm text-zinc-700">
+      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Your farms</h2>
+        <ul className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
           {farms.map((f) => (
             <li key={f.id}>
               <button
                 type="button"
                 className={`text-left underline-offset-2 hover:underline ${
-                  f.id === farmId ? "font-semibold text-emerald-800" : ""
+                  f.id === farmId ? "font-semibold text-emerald-800 dark:text-emerald-400" : ""
                 }`}
                 onClick={() => setFarmId(f.id)}
               >
                 {f.name}
               </button>
-              <span className="ml-2 text-xs text-zinc-500">({f.my_role})</span>
+              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">({f.my_role})</span>
               {f.location && (
-                <span className="text-zinc-500"> — {f.location}</span>
+                <span className="text-zinc-500 dark:text-zinc-400"> — {f.location}</span>
               )}
             </li>
           ))}
-          {!farms.length && <li className="text-zinc-500">No farms yet.</li>}
+          {!farms.length && <li className="text-zinc-500 dark:text-zinc-400">No farms yet.</li>}
         </ul>
       </section>
 
       {farmId && currentFarm && (
         <>
           {canManage && (
-            <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-zinc-900">
+            <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                 Farm details
               </h2>
               <form onSubmit={saveFarmDetails} className="mt-4 space-y-3">
@@ -368,11 +368,11 @@ export default function SettingsPage() {
             </section>
           )}
 
-          <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="p-6 pb-2">
-              <h2 className="text-lg font-semibold text-zinc-900">Sheds</h2>
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Sheds</h2>
             </div>
-            <ul className="space-y-2 px-6 text-sm text-zinc-600">
+            <ul className="space-y-2 px-6 text-sm text-zinc-600 dark:text-zinc-400">
               {sheds.map((s) => (
                 <li key={s.id} className="flex flex-wrap items-center gap-2">
                   {editingShed === s.id ? (
@@ -398,7 +398,7 @@ export default function SettingsPage() {
                       </button>
                       <button
                         type="button"
-                        className="text-xs text-zinc-500"
+                        className="text-xs text-zinc-500 dark:text-zinc-400"
                         onClick={() => setEditingShed(null)}
                       >
                         Cancel
@@ -412,7 +412,7 @@ export default function SettingsPage() {
                       {canManage && (
                         <button
                           type="button"
-                          className="text-xs text-emerald-700 hover:underline"
+                          className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
                           onClick={() => {
                             setEditingShed(s.id);
                             setEditShedName(s.name);
@@ -427,7 +427,7 @@ export default function SettingsPage() {
                 </li>
               ))}
               {!sheds.length && (
-                <li className="text-zinc-500">No sheds on this page.</li>
+                <li className="text-zinc-500 dark:text-zinc-400">No sheds on this page.</li>
               )}
             </ul>
             <PaginationFooter
@@ -440,7 +440,7 @@ export default function SettingsPage() {
             {canManage && (
               <form
                 onSubmit={addShed}
-                className="grid gap-2 border-t border-zinc-100 p-6 sm:grid-cols-3"
+                className="grid gap-2 border-t border-zinc-100 dark:border-zinc-800 p-6 sm:grid-cols-3"
               >
                 <input
                   placeholder="Shed name"
@@ -468,12 +468,12 @@ export default function SettingsPage() {
           </section>
 
           {canManage && (
-            <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+            <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
               <div className="p-6 pb-2">
-                <h2 className="text-lg font-semibold text-zinc-900">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                   Team members
                 </h2>
-                <p className="mt-1 text-sm text-zinc-500">
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                   Change roles here. Only owners may assign the owner role or
                   edit another owner. The last owner cannot be demoted.
                 </p>
@@ -485,12 +485,12 @@ export default function SettingsPage() {
                   return (
                     <li
                       key={m.user_id}
-                      className="flex flex-wrap items-center gap-2 border-b border-zinc-50 py-2"
+                      className="flex flex-wrap items-center gap-2 border-b border-zinc-50 dark:border-zinc-800/80 py-2"
                     >
                       <span className="font-medium">{m.name}</span>
-                      <span className="text-zinc-500">&lt;{m.email}&gt;</span>
+                      <span className="text-zinc-500 dark:text-zinc-400">&lt;{m.email}&gt;</span>
                       {locked ? (
-                        <span className="text-emerald-800">({m.role})</span>
+                        <span className="text-emerald-800 dark:text-emerald-400">({m.role})</span>
                       ) : (
                         <select
                           className="rounded border border-zinc-200 px-2 py-1 text-sm"
@@ -514,7 +514,7 @@ export default function SettingsPage() {
                   );
                 })}
                 {!members.length && (
-                  <li className="py-4 text-zinc-500">No members on this page.</li>
+                  <li className="py-4 text-zinc-500 dark:text-zinc-400">No members on this page.</li>
                 )}
               </ul>
               <PaginationFooter
@@ -525,8 +525,8 @@ export default function SettingsPage() {
                 onOffsetChange={setMemOffset}
               />
 
-              <div className="border-t border-zinc-100 p-6">
-                <h3 className="text-sm font-semibold text-zinc-800">
+              <div className="border-t border-zinc-100 dark:border-zinc-800 p-6">
+                <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                   Invite by email
                 </h3>
                 <form
@@ -549,7 +549,7 @@ export default function SettingsPage() {
                   </button>
                 </form>
 
-                <h3 className="mt-6 text-sm font-semibold text-zinc-800">
+                <h3 className="mt-6 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                   Or search registered users
                 </h3>
                 <input
@@ -559,7 +559,7 @@ export default function SettingsPage() {
                   onChange={(e) => setUserQuery(e.target.value)}
                 />
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">Role for invite:</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">Role for invite:</span>
                   <select
                     className="rounded-md border border-zinc-200 px-2 py-1 text-sm"
                     value={memberRole}
@@ -581,7 +581,7 @@ export default function SettingsPage() {
                     >
                       <span>
                         {u.name}{" "}
-                        <span className="text-zinc-500">{u.email}</span>
+                        <span className="text-zinc-500 dark:text-zinc-400">{u.email}</span>
                       </span>
                       <button
                         type="button"
@@ -593,7 +593,7 @@ export default function SettingsPage() {
                     </li>
                   ))}
                   {!searchHits.length && !searchBusy && (
-                    <li className="text-zinc-500">
+                    <li className="text-zinc-500 dark:text-zinc-400">
                       No users match (or all are members).
                     </li>
                   )}

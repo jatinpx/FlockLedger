@@ -8,6 +8,7 @@ import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
 import { apiFetch, type Paginated } from "@/lib/api";
 import { toastError } from "@/lib/toast";
+import { useChartPalette } from "@/lib/theme-context";
 import { withPagination } from "@/components/PaginationFooter";
 import {
   CartesianGrid,
@@ -32,6 +33,7 @@ type FeedPoint = {
 const CHART_PAGE = 500;
 
 export default function AnalyticsPage() {
+  const pal = useChartPalette();
   const { farmId } = useFarm();
   const runLoaded = useAsyncLoader();
   const [eggs, setEggs] = useState<EggPoint[]>([]);
@@ -141,19 +143,19 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, retryTick, runLoaded]);
+  }, [farmId, retryTick]);
 
   if (!farmId) {
-    return <p className="text-zinc-500">Select a farm first.</p>;
+    return <p className="text-zinc-500 dark:text-zinc-400">Select a farm first.</p>;
   }
 
   if (loadFailed) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
-        <p className="text-zinc-600">Analytics could not be loaded.</p>
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <p className="text-zinc-600 dark:text-zinc-400">Analytics could not be loaded.</p>
         <button
           type="button"
-          className="mt-4 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+          className="mt-4 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
           onClick={() => setRetryTick((t) => t + 1)}
         >
           Try again
@@ -163,7 +165,7 @@ export default function AnalyticsPage() {
   }
 
   if (!profit && !eggs.length && !feed.length) {
-    return <p className="text-zinc-500">Loading analytics…</p>;
+    return <p className="text-zinc-500 dark:text-zinc-400">Loading analytics…</p>;
   }
 
   const profitChartData = dailyProfit.map((d) => ({
@@ -180,32 +182,39 @@ export default function AnalyticsPage() {
         <FeedUsageChart data={feed} />
       </div>
 
-      <div className="h-80 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-2 text-sm font-semibold text-zinc-800">Daily profit (30d)</h3>
+      <div className="h-80 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">Daily profit (30d)</h3>
         <ResponsiveContainer width="100%" height="90%">
           <LineChart data={profitChartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip />
+            <CartesianGrid strokeDasharray="3 3" stroke={pal.grid} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: pal.axis }} stroke={pal.axis} />
+            <YAxis tick={{ fontSize: 11, fill: pal.axis }} stroke={pal.axis} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: pal.tooltipBg,
+                border: `1px solid ${pal.tooltipBorder}`,
+                borderRadius: "8px",
+                color: pal.tooltipColor,
+              }}
+            />
             <Legend />
-            <Line type="monotone" dataKey="profit" stroke="#047857" name="Profit" dot={false} />
+            <Line type="monotone" dataKey="profit" stroke={pal.primary} name="Profit" dot={false} />
             <Line type="monotone" dataKey="revenue" stroke="#2563eb" name="Revenue" dot={false} />
             <Line type="monotone" dataKey="expenses" stroke="#dc2626" name="Expenses" dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 sm:grid-cols-2">
+      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 sm:grid-cols-2">
         <div>
-          <p className="font-semibold text-zinc-900">ML: eggs next week</p>
-          <pre className="mt-2 overflow-x-auto rounded bg-white p-2 text-xs">
+          <p className="font-semibold text-zinc-900 dark:text-zinc-100">ML: eggs next week</p>
+          <pre className="mt-2 overflow-x-auto rounded border border-zinc-200 bg-white p-2 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
             {JSON.stringify(mlEgg, null, 2)}
           </pre>
         </div>
         <div>
-          <p className="font-semibold text-zinc-900">ML: feed next 30d</p>
-          <pre className="mt-2 overflow-x-auto rounded bg-white p-2 text-xs">
+          <p className="font-semibold text-zinc-900 dark:text-zinc-100">ML: feed next 30d</p>
+          <pre className="mt-2 overflow-x-auto rounded border border-zinc-200 bg-white p-2 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
             {JSON.stringify(mlFeed, null, 2)}
           </pre>
         </div>

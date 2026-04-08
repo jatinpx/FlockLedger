@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { PaginationFooter, withPagination } from "@/components/PaginationFooter";
 import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
@@ -46,9 +46,9 @@ export default function ProductionPage() {
       setTotal(eggRes.total);
       setShedId((prev) => prev || (shedRes.items.length ? String(shedRes.items[0].id) : ""));
     });
-  }, [farmId, limit, offset, runLoaded]);
+  }, [farmId, limit, offset]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setOffset(0);
   }, [limit, farmId]);
 
@@ -111,21 +111,21 @@ export default function ProductionPage() {
   }
 
   if (!farmId) {
-    return <p className="text-zinc-500">Select or create a farm in Settings.</p>;
+    return <p className="text-zinc-500 dark:text-zinc-400">Select or create a farm in Settings.</p>;
   }
 
   return (
     <div className="space-y-8">
       <form
         onSubmit={submit}
-        className="max-w-lg space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
+        className="max-w-lg space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
       >
-        <h2 className="text-lg font-semibold text-zinc-900">Add egg production</h2>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add egg production</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-sm text-zinc-600">Shed</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Shed</label>
             <select
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={shedId}
               onChange={(e) => setShedId(e.target.value)}
               required
@@ -138,32 +138,32 @@ export default function ProductionPage() {
             </select>
           </div>
           <div>
-            <label className="text-sm text-zinc-600">Date</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Date</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="text-sm text-zinc-600">Eggs produced</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Eggs produced</label>
             <input
               type="number"
               min={0}
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={eggs}
               onChange={(e) => setEggs(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="text-sm text-zinc-600">Broken eggs</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Broken eggs</label>
             <input
               type="number"
               min={0}
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={broken}
               onChange={(e) => setBroken(e.target.value)}
             />
@@ -171,18 +171,18 @@ export default function ProductionPage() {
         </div>
         <button
           type="submit"
-          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
         >
           Save
         </button>
       </form>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-zinc-900">Recent records</h2>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+        <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recent records</h2>
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-zinc-100 bg-zinc-50 text-xs uppercase text-zinc-500">
+              <thead className="border-b border-zinc-100 bg-zinc-50 dark:bg-zinc-900 text-xs uppercase text-zinc-500 dark:text-zinc-400">
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Shed</th>
@@ -196,18 +196,18 @@ export default function ProductionPage() {
               <tbody>
                 {rows.map((r) =>
                   editingId === r.id ? (
-                    <tr key={r.id} className="border-b border-zinc-50 bg-zinc-50/80">
+                    <tr key={r.id} className="border-b border-zinc-50 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/80">
                       <td className="px-4 py-2 align-top">
                         <input
                           type="date"
-                          className="w-full rounded border border-zinc-200 px-2 py-1 text-xs"
+                          className="w-full rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                           value={editDate}
                           onChange={(e) => setEditDate(e.target.value)}
                         />
                       </td>
                       <td className="px-4 py-2 align-top">
                         <select
-                          className="w-full max-w-[140px] rounded border border-zinc-200 px-2 py-1 text-xs"
+                          className="w-full max-w-[140px] rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                           value={editShedId}
                           onChange={(e) => setEditShedId(e.target.value)}
                         >
@@ -222,7 +222,7 @@ export default function ProductionPage() {
                         <input
                           type="number"
                           min={0}
-                          className="w-20 rounded border border-zinc-200 px-2 py-1 text-xs"
+                          className="w-20 rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                           value={editEggs}
                           onChange={(e) => setEditEggs(e.target.value)}
                         />
@@ -231,7 +231,7 @@ export default function ProductionPage() {
                         <input
                           type="number"
                           min={0}
-                          className="w-16 rounded border border-zinc-200 px-2 py-1 text-xs"
+                          className="w-16 rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                           value={editBroken}
                           onChange={(e) => setEditBroken(e.target.value)}
                         />
@@ -241,14 +241,14 @@ export default function ProductionPage() {
                       <td className="whitespace-nowrap px-4 py-2 align-top">
                         <button
                           type="button"
-                          className="mr-2 text-xs text-emerald-700 hover:underline"
+                          className="mr-2 text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
                           onClick={() => void saveEdit()}
                         >
                           Save
                         </button>
                         <button
                           type="button"
-                          className="text-xs text-zinc-500 hover:underline"
+                          className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline"
                           onClick={() => setEditingId(null)}
                         >
                           Cancel
@@ -256,7 +256,7 @@ export default function ProductionPage() {
                       </td>
                     </tr>
                   ) : (
-                    <tr key={r.id} className="border-b border-zinc-50">
+                    <tr key={r.id} className="border-b border-zinc-50 dark:border-zinc-800/80">
                       <td className="px-4 py-3">{r.date}</td>
                       <td className="px-4 py-3">
                         {sheds.find((s) => s.id === r.shed_id)?.name ?? r.shed_id}
@@ -268,7 +268,7 @@ export default function ProductionPage() {
                       <td className="px-4 py-3">
                         <button
                           type="button"
-                          className="text-xs text-emerald-700 hover:underline"
+                          className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
                           onClick={() => startEdit(r)}
                         >
                           Edit

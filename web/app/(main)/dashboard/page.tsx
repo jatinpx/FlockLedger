@@ -60,7 +60,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, retryTick, runLoaded]);
+  }, [farmId, retryTick]);
 
   useEffect(() => {
     if (!farmId || typeof window === "undefined") return;
@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
   if (!farmId) {
     return (
-      <p className="text-zinc-500">
+      <p className="text-zinc-500 dark:text-zinc-400">
         Create a farm under Settings, or ask an owner to add you.
       </p>
     );
@@ -93,11 +93,11 @@ export default function DashboardPage() {
 
   if (loadFailed && !data) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
-        <p className="text-zinc-600">The dashboard could not be loaded.</p>
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <p className="text-zinc-600 dark:text-zinc-400">The dashboard could not be loaded.</p>
         <button
           type="button"
-          className="mt-4 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+          className="mt-4 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
           onClick={() => setRetryTick((t) => t + 1)}
         >
           Try again
@@ -107,13 +107,13 @@ export default function DashboardPage() {
   }
 
   if (!data) {
-    return <p className="text-zinc-500">Loading dashboard…</p>;
+    return <p className="text-zinc-500 dark:text-zinc-400">Loading dashboard…</p>;
   }
 
   return (
     <div className="space-y-8">
       {live && (
-        <p className="rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+        <p className="rounded-md border border-emerald-100 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-400">
           Live: {live}
         </p>
       )}

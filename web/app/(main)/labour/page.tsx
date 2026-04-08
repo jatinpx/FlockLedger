@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { PaginationFooter, withPagination } from "@/components/PaginationFooter";
 import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
@@ -61,7 +61,7 @@ export default function LabourPage() {
       setRows(res.items);
       setTotal(res.total);
     });
-  }, [farmId, limit, offset, runLoaded]);
+  }, [farmId, limit, offset]);
 
   const refreshLedger = useCallback(async () => {
     if (!farmId || selectedId == null) return;
@@ -76,9 +76,9 @@ export default function LabourPage() {
       setLedgerRows(res.items);
       setLedgerTotal(res.total);
     });
-  }, [farmId, selectedId, ledgerLimit, ledgerOffset, runLoaded]);
+  }, [farmId, selectedId, ledgerLimit, ledgerOffset]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setOffset(0);
   }, [limit, farmId]);
 
@@ -86,7 +86,7 @@ export default function LabourPage() {
     refresh().catch((e) => toastError(e));
   }, [refresh]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setLedgerOffset(0);
   }, [selectedId, ledgerLimit]);
 
@@ -197,7 +197,7 @@ export default function LabourPage() {
   }
 
   if (!farmId) {
-    return <p className="text-zinc-500">Select or create a farm in Settings.</p>;
+    return <p className="text-zinc-500 dark:text-zinc-400">Select or create a farm in Settings.</p>;
   }
 
   const selected = rows.find((r) => r.id === selectedId);
@@ -213,41 +213,41 @@ export default function LabourPage() {
       {canManage ? (
         <form
           onSubmit={createPerson}
-          className="max-w-xl space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
+          className="max-w-xl space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
         >
-          <h2 className="text-lg font-semibold text-zinc-900">Add field staff or owner-pay line</h2>
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add field staff or owner-pay line</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="text-sm text-zinc-600">Full name</label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">Full name</label>
               <input
-                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
             <div>
-              <label className="text-sm text-zinc-600">Phone (optional)</label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">Phone (optional)</label>
               <input
-                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm text-zinc-600">Hired / start date</label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">Hired / start date</label>
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={hiredAt}
                 onChange={(e) => setHiredAt(e.target.value)}
                 required
               />
             </div>
             <div>
-              <label className="text-sm text-zinc-600">Role</label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">Role</label>
               <select
-                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={personnelKind}
                 onChange={(e) => setPersonnelKind(e.target.value as "labour" | "owner_pay")}
               >
@@ -256,9 +256,9 @@ export default function LabourPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm text-zinc-600">Compensation</label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">Compensation</label>
               <select
-                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={compensationType}
                 onChange={(e) =>
                   setCompensationType(e.target.value as typeof compensationType)
@@ -271,21 +271,21 @@ export default function LabourPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm text-zinc-600">Default rate (optional)</label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">Default rate (optional)</label>
               <input
                 type="number"
                 step="0.01"
                 min={0}
-                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={defaultRate}
                 onChange={(e) => setDefaultRate(e.target.value)}
                 placeholder="Reference only"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-sm text-zinc-600">Notes</label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">Notes</label>
               <input
-                className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
@@ -293,21 +293,21 @@ export default function LabourPage() {
           </div>
           <button
             type="submit"
-            className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+            className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
           >
             Save person
           </button>
         </form>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-          <h2 className="text-sm font-semibold text-zinc-800">People</h2>
-          <p className="text-xs text-zinc-500">Select a row to view or post ledger lines.</p>
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="border-b border-zinc-100 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+          <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">People</h2>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Select a row to view or post ledger lines.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-zinc-100 text-xs uppercase text-zinc-500">
+            <thead className="border-b border-zinc-100 text-xs uppercase text-zinc-500 dark:text-zinc-400">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Kind</th>
@@ -321,23 +321,23 @@ export default function LabourPage() {
               {rows.map((r) => (
                 <tr
                   key={r.id}
-                  className={`cursor-pointer border-b border-zinc-50 ${
-                    selectedId === r.id ? "bg-emerald-50/60" : "hover:bg-zinc-50/80"
+                  className={`cursor-pointer border-b border-zinc-50 dark:border-zinc-800/80 ${
+                    selectedId === r.id ? "bg-emerald-50 dark:bg-emerald-950/40/60 dark:bg-emerald-950/30" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/80 dark:hover:bg-zinc-800/80 dark:bg-zinc-900/80"
                   }`}
                   onClick={() => setSelectedId(r.id)}
                 >
-                  <td className="px-4 py-3 font-medium text-zinc-900">{r.full_name}</td>
-                  <td className="px-4 py-3 text-zinc-600">
+                  <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{r.full_name}</td>
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {r.personnel_kind === "owner_pay" ? "Owner pay" : "Labour"}
                   </td>
-                  <td className="px-4 py-3 text-zinc-600">{r.compensation_type}</td>
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{r.compensation_type}</td>
                   <td
                     className={`px-4 py-3 font-medium ${
                       r.balance_due > 0
                         ? "text-amber-800"
                         : r.balance_due < 0
-                          ? "text-emerald-800"
-                          : "text-zinc-600"
+                          ? "text-emerald-800 dark:text-emerald-400"
+                          : "text-zinc-600 dark:text-zinc-400"
                     }`}
                   >
                     {fmtInr(r.balance_due)}
@@ -347,7 +347,7 @@ export default function LabourPage() {
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        className="text-xs text-emerald-700 hover:underline"
+                        className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
                         onClick={() => void toggleActive(r)}
                       >
                         {r.is_active ? "Deactivate" : "Reactivate"}
@@ -370,15 +370,15 @@ export default function LabourPage() {
 
       {selectedId != null && selected ? (
         <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-900">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             Ledger — {selected.full_name}
           </h2>
           {canManage ? (
             <form onSubmit={addLedgerLine} className="grid max-w-2xl gap-3 sm:grid-cols-2">
               <div>
-                <label className="text-sm text-zinc-600">Type</label>
+                <label className="text-sm text-zinc-600 dark:text-zinc-400">Type</label>
                 <select
-                  className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   value={lineType}
                   onChange={(e) =>
                     setLineType(e.target.value as typeof lineType)
@@ -390,37 +390,37 @@ export default function LabourPage() {
                 </select>
               </div>
               <div>
-                <label className="text-sm text-zinc-600">Amount (INR)</label>
+                <label className="text-sm text-zinc-600 dark:text-zinc-400">Amount (INR)</label>
                 <input
                   type="number"
                   step="0.01"
-                  className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   value={lineAmount}
                   onChange={(e) => setLineAmount(e.target.value)}
                   required
                 />
                 {lineType === "adjustment" ? (
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                     Use negative to reduce balance (e.g. advance taken).
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs text-zinc-500">Enter a positive amount.</p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Enter a positive amount.</p>
                 )}
               </div>
               <div>
-                <label className="text-sm text-zinc-600">Date</label>
+                <label className="text-sm text-zinc-600 dark:text-zinc-400">Date</label>
                 <input
                   type="date"
-                  className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   value={lineDate}
                   onChange={(e) => setLineDate(e.target.value)}
                   required
                 />
               </div>
               <div>
-                <label className="text-sm text-zinc-600">Description</label>
+                <label className="text-sm text-zinc-600 dark:text-zinc-400">Description</label>
                 <input
-                  className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   value={lineDesc}
                   onChange={(e) => setLineDesc(e.target.value)}
                 />
@@ -432,7 +432,7 @@ export default function LabourPage() {
                     checked={forceInactive}
                     onChange={(e) => setForceInactive(e.target.checked)}
                   />
-                  <span className="text-sm text-zinc-700">
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300">
                     Person is inactive — allow posting (cleanup / final settlement)
                   </span>
                 </label>
@@ -440,19 +440,19 @@ export default function LabourPage() {
               <div className="sm:col-span-2">
                 <button
                   type="submit"
-                  className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+                  className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                 >
                   Add line
                 </button>
               </div>
             </form>
           ) : (
-            <p className="text-sm text-zinc-500">Managers can post payments and earnings.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Managers can post payments and earnings.</p>
           )}
 
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-zinc-100 text-xs uppercase text-zinc-500">
+              <thead className="border-b border-zinc-100 text-xs uppercase text-zinc-500 dark:text-zinc-400">
                 <tr>
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Type</th>
@@ -463,11 +463,11 @@ export default function LabourPage() {
               </thead>
               <tbody>
                 {ledgerRows.map((L) => (
-                  <tr key={L.id} className="border-b border-zinc-50">
+                  <tr key={L.id} className="border-b border-zinc-50 dark:border-zinc-800/80">
                     <td className="px-3 py-2">{L.line_date}</td>
                     <td className="px-3 py-2">{L.line_type}</td>
                     <td className="px-3 py-2">{fmtInr(L.amount)}</td>
-                    <td className="px-3 py-2 text-zinc-600">{L.description ?? "—"}</td>
+                    <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{L.description ?? "—"}</td>
                     {canManage ? (
                       <td className="px-3 py-2">
                         <button

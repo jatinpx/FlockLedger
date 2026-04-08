@@ -102,6 +102,8 @@ export type SaleRow = {
   buyer_name: string;
   trays_sold: number;
   rate_per_tray: number;
+  /** ₹ per egg (30 eggs = 1 tray); omit on older API responses. */
+  rate_per_egg?: number;
   total_amount: number;
   date: string;
   created_at: string;

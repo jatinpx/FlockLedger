@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { PaginationFooter, withPagination } from "@/components/PaginationFooter";
 import { useFarm } from "@/lib/farm-context";
 import { useAsyncLoader } from "@/lib/loading-context";
@@ -38,9 +38,9 @@ export default function ExpensesPage() {
       setRows(res.items);
       setTotal(res.total);
     });
-  }, [farmId, limit, offset, runLoaded]);
+  }, [farmId, limit, offset]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setOffset(0);
   }, [limit, farmId]);
 
@@ -103,7 +103,7 @@ export default function ExpensesPage() {
   }
 
   if (!farmId) {
-    return <p className="text-zinc-500">Select or create a farm in Settings.</p>;
+    return <p className="text-zinc-500 dark:text-zinc-400">Select or create a farm in Settings.</p>;
   }
 
   const fmt = (n: number) =>
@@ -115,47 +115,47 @@ export default function ExpensesPage() {
     <div className="space-y-8">
       <form
         onSubmit={submit}
-        className="max-w-lg space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
+        className="max-w-lg space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
       >
-        <h2 className="text-lg font-semibold text-zinc-900">Add expense</h2>
-        <p className="text-sm text-zinc-500">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add expense</h2>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Managers and owners can add expenses. Workers can view the list.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-sm text-zinc-600">Category</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Category</label>
             <input
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="text-sm text-zinc-600">Amount (₹)</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Amount (₹)</label>
             <input
               type="number"
               step="0.01"
               min={0}
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="text-sm text-zinc-600">Description</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Description</label>
             <input
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="text-sm text-zinc-600">Date</label>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">Date</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
@@ -164,16 +164,16 @@ export default function ExpensesPage() {
         </div>
         <button
           type="submit"
-          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
         >
           Save
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-zinc-100 bg-zinc-50 text-xs uppercase text-zinc-500">
+            <thead className="border-b border-zinc-100 bg-zinc-50 dark:bg-zinc-900 text-xs uppercase text-zinc-500 dark:text-zinc-400">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Category</th>
@@ -185,18 +185,18 @@ export default function ExpensesPage() {
             <tbody>
               {rows.map((r) =>
                 editingId === r.id ? (
-                  <tr key={r.id} className="border-b border-zinc-50 bg-zinc-50/80">
+                  <tr key={r.id} className="border-b border-zinc-50 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/80">
                     <td className="px-4 py-2 align-top">
                       <input
                         type="date"
-                        className="rounded border border-zinc-200 px-2 py-1 text-xs"
+                        className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                         value={editDate}
                         onChange={(e) => setEditDate(e.target.value)}
                       />
                     </td>
                     <td className="px-4 py-2 align-top">
                       <input
-                        className="min-w-[80px] rounded border border-zinc-200 px-2 py-1 text-xs"
+                        className="min-w-[80px] rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                         value={editCategory}
                         onChange={(e) => setEditCategory(e.target.value)}
                       />
@@ -206,14 +206,14 @@ export default function ExpensesPage() {
                         type="number"
                         step="0.01"
                         min={0}
-                        className="w-24 rounded border border-zinc-200 px-2 py-1 text-xs"
+                        className="w-24 rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                         value={editAmount}
                         onChange={(e) => setEditAmount(e.target.value)}
                       />
                     </td>
                     <td className="px-4 py-2 align-top">
                       <input
-                        className="min-w-[120px] rounded border border-zinc-200 px-2 py-1 text-xs"
+                        className="min-w-[120px] rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                         value={editDescription}
                         onChange={(e) => setEditDescription(e.target.value)}
                       />
@@ -221,14 +221,14 @@ export default function ExpensesPage() {
                     <td className="whitespace-nowrap px-4 py-2 align-top">
                       <button
                         type="button"
-                        className="mr-2 text-xs text-emerald-700 hover:underline"
+                        className="mr-2 text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
                         onClick={() => void saveEdit()}
                       >
                         Save
                       </button>
                       <button
                         type="button"
-                        className="text-xs text-zinc-500 hover:underline"
+                        className="text-xs text-zinc-500 dark:text-zinc-400 hover:underline"
                         onClick={() => setEditingId(null)}
                       >
                         Cancel
@@ -236,15 +236,15 @@ export default function ExpensesPage() {
                     </td>
                   </tr>
                 ) : (
-                  <tr key={r.id} className="border-b border-zinc-50">
+                  <tr key={r.id} className="border-b border-zinc-50 dark:border-zinc-800/80">
                     <td className="px-4 py-3">{r.date}</td>
                     <td className="px-4 py-3">{r.category}</td>
                     <td className="px-4 py-3">{fmt(r.amount)}</td>
-                    <td className="px-4 py-3 text-zinc-600">{r.description ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{r.description ?? "—"}</td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
-                        className="text-xs text-emerald-700 hover:underline"
+                        className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
                         onClick={() => startEdit(r)}
                       >
                         Edit
