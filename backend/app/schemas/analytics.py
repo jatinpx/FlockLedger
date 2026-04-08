@@ -21,6 +21,11 @@ class DashboardSummary(BaseModel):
     tray_stock: dict
     last_7_days_eggs: int
     last_7_days_trays: int
+    labour_due_total: float = 0
+    """Sum of positive balances owed to field staff / owner-pay lines."""
+    flock_mortality_total: int = 0
+    flock_birds_added_total: int = 0
+    flock_birds_removed_total: int = 0
 
 
 class ProfitPoint(BaseModel):

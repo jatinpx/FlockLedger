@@ -10,6 +10,8 @@ const mainLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/production", label: "Production" },
   { href: "/feed", label: "Feed" },
+  { href: "/labour", label: "Labour" },
+  { href: "/flock", label: "Flock" },
   { href: "/sales", label: "Sales" },
   { href: "/expenses", label: "Expenses" },
   { href: "/analytics", label: "Analytics" },
