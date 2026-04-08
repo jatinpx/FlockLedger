@@ -11,6 +11,7 @@ from app.schemas.analytics import (
     DashboardSummary,
     EggDailyPoint,
     FeedDailyPoint,
+    ProfitExpenseBreakdown,
     ProfitPoint,
     ProfitSummaryOut,
 )
@@ -24,7 +25,16 @@ router = APIRouter(prefix="/farms/{farm_id}/analytics", tags=["analytics"])
 MANAGER_ROLES = ("owner", "manager")
 
 
-@router.get("/dashboard", response_model=DashboardSummary)
+@router.get(
+    "/dashboard",
+    response_model=DashboardSummary,
+    summary="Dashboard KPIs for the selected period",
+    description=(
+        "`labour_due_total` is the sum of max(0, running ledger balance) across all labour rows "
+        "(cumulative owed). For month-scoped accrual and paid amounts, use "
+        "`GET /farms/{farm_id}/labour/payroll`."
+    ),
+)
 def dashboard(
     farm_id: int,
     user: CurrentUser,
@@ -99,6 +109,7 @@ def profit_range(
     require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
     start, end = period
     s = asvc.profit_summary(db, farm_id, start, end)
+    br = s["expense_breakdown"]
     return ProfitSummaryOut(
         period_start=start.isoformat(),
         period_end=end.isoformat(),
@@ -107,6 +118,12 @@ def profit_range(
         profit=s["profit"],
         cost_per_egg=s["cost_per_egg"],
         usable_eggs_in_period=int(s.get("usable_eggs_in_period", 0) or 0),
+        expense_breakdown=ProfitExpenseBreakdown(
+            expense_entries=br["expense_entries"],
+            unlinked_labour_payments=br["unlinked_labour_payments"],
+            feed_purchase_cost_on_entries=br["feed_purchase_cost_on_entries"],
+            total=br["total"],
+        ),
     )
 
 

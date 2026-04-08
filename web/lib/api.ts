@@ -91,6 +91,8 @@ export type FeedRow = {
   feed_received: number;
   feed_used: number;
   feed_remaining: number;
+  /** Cash paid for feed received (included in P&L when set). */
+  purchase_cost_inr?: number | null;
   opening_balance_kg?: number;
   remaining_auto?: boolean;
   created_at: string;
@@ -111,6 +113,9 @@ export type SaleRow = {
 
 export const MISCELLANEOUS_EXPENSE_CATEGORY = "Miscellaneous" as const;
 
+/** Must match backend `LABOUR_WAGES_CATEGORY` for wage picker / `labour_id` on create. */
+export const LABOUR_WAGES_CATEGORY = "Labour & wages" as const;
+
 export async function fetchExpenseCategories(): Promise<string[]> {
   return apiFetch<string[]>("/expense-categories");
 }
@@ -123,6 +128,10 @@ export type ExpenseRow = {
   description: string | null;
   date: string;
   created_at: string;
+  labour_ledger_line_id?: number | null;
+  feed_inventory_id?: number | null;
+  linked_labour_id?: number | null;
+  linked_labour_name?: string | null;
 };
 
 export type AuditLogRow = {
@@ -158,6 +167,13 @@ export type DashboardSummary = {
   flock_birds_removed_total: number;
 };
 
+export type ProfitExpenseBreakdown = {
+  expense_entries: number;
+  unlinked_labour_payments: number;
+  feed_purchase_cost_on_entries: number;
+  total: number;
+};
+
 export type ProfitSummaryOut = {
   period_start: string;
   period_end: string;
@@ -166,6 +182,7 @@ export type ProfitSummaryOut = {
   profit: number;
   cost_per_egg: number | null;
   usable_eggs_in_period?: number;
+  expense_breakdown: ProfitExpenseBreakdown;
 };
 
 export type FarmLabourRow = {
@@ -203,6 +220,29 @@ export type LabourLedgerRow = {
   description: string | null;
   created_by_user_id: number;
   created_at: string;
+  linked_expense_id?: number | null;
+};
+
+export type PayrollWorkerRow = {
+  labour_id: number;
+  full_name: string;
+  linked_user_id: number | null;
+  personnel_kind: string;
+  is_active: boolean;
+  monthly_salary: number | null;
+  balance_due: number;
+  month: string;
+  month_accrued: number;
+  month_paid: number;
+  month_net: number;
+  payroll_accrual_posted: boolean;
+  payroll_accrual_amount: number | null;
+};
+
+export type PayrollListResponse = {
+  month: string;
+  labour_due_definition: string;
+  workers: PayrollWorkerRow[];
 };
 
 export type FlockSummary = {

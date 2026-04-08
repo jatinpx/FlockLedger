@@ -63,6 +63,10 @@ class LabourLedgerCreate(BaseModel):
     amount: Decimal
     line_date: Date
     description: str | None = Field(None, max_length=512)
+    sync_pl_expense: bool = Field(
+        True,
+        description="Ignored: payments always create a linked P&L expense. Kept for API compatibility.",
+    )
 
     @model_validator(mode="after")
     def amount_rules(self):
@@ -83,6 +87,7 @@ class LabourLedgerOut(BaseModel):
     description: str | None
     created_by_user_id: int
     created_at: datetime
+    linked_expense_id: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -93,3 +98,67 @@ class LabourBalanceRow(BaseModel):
     personnel_kind: str
     is_active: bool
     balance: float
+
+
+class PayrollWorkerOut(BaseModel):
+    labour_id: int
+    full_name: str
+    linked_user_id: int | None
+    personnel_kind: str
+    is_active: bool
+    monthly_salary: float | None
+    balance_due: float
+    month: str
+    month_accrued: float
+    month_paid: float
+    month_net: float
+    payroll_accrual_posted: bool
+    payroll_accrual_amount: float | None
+
+
+PAYROLL_LABOUR_DUE_DEFINITION = (
+    "Dashboard labour_due_total (analytics) is the sum over labour rows of "
+    "max(0, running ledger balance). Month fields here are calendar-month sums on the "
+    "ledger for the selected month only."
+)
+
+
+class PayrollListOut(BaseModel):
+    month: str
+    labour_due_definition: str = Field(
+        default=PAYROLL_LABOUR_DUE_DEFINITION,
+        description=PAYROLL_LABOUR_DUE_DEFINITION,
+    )
+    workers: list[PayrollWorkerOut]
+
+
+class PayrollAccrueBody(BaseModel):
+    labour_id: int | None = None
+    user_id: int | None = None
+    month: str = Field(..., pattern=r"^\d{4}-\d{2}$")
+    amount: float | None = Field(None, ge=0, description="Defaults to labour default_rate / monthly salary")
+
+    @model_validator(mode="after")
+    def exactly_one_target(self):
+        has_labour = self.labour_id is not None
+        has_user = self.user_id is not None
+        if has_labour == has_user:
+            raise ValueError("Exactly one of labour_id or user_id is required")
+        return self
+
+
+class PayrollPayoutBody(BaseModel):
+    labour_id: int | None = None
+    user_id: int | None = None
+    month: str = Field(..., pattern=r"^\d{4}-\d{2}$")
+    amount: Decimal = Field(..., gt=0)
+    line_date: Date
+    description: str | None = Field(None, max_length=512)
+
+    @model_validator(mode="after")
+    def exactly_one_target(self):
+        has_labour = self.labour_id is not None
+        has_user = self.user_id is not None
+        if has_labour == has_user:
+            raise ValueError("Exactly one of labour_id or user_id is required")
+        return self

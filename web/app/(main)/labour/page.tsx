@@ -10,6 +10,7 @@ import {
   type FarmLabourRow,
   type LabourLedgerRow,
   type Paginated,
+  type PayrollListResponse,
 } from "@/lib/api";
 import { pageQuery } from "@/lib/pagination";
 import { toastError, toastSuccess } from "@/lib/toast";
@@ -19,6 +20,21 @@ const LEDGER_LIMIT = 50;
 
 const fmtInr = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
+
+function currentMonthYm(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function lastDayOfMonthLocal(ym: string): string {
+  const [ys, ms] = ym.split("-");
+  const y = Number(ys);
+  const m = Number(ms);
+  const d = new Date(y, m, 0);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
 
 function workerMembersFreeForCreate(rows: FarmLabourRow[], members: FarmMemberRow[]) {
   const taken = new Set(
@@ -64,6 +80,14 @@ export default function LabourPage() {
   const [linkUserId, setLinkUserId] = useState("");
   const [workerMembers, setWorkerMembers] = useState<FarmMemberRow[]>([]);
 
+  const [payrollMonth, setPayrollMonth] = useState(currentMonthYm);
+  const [payroll, setPayroll] = useState<PayrollListResponse | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [monthlySalaryInput, setMonthlySalaryInput] = useState("");
+  const [accrueAmountInput, setAccrueAmountInput] = useState("");
+  const [payoutAmountInput, setPayoutAmountInput] = useState("");
+  const [payoutDateInput, setPayoutDateInput] = useState(() => lastDayOfMonthLocal(currentMonthYm()));
+
   const refresh = useCallback(async () => {
     if (!farmId) return;
     await runLoaded(async () => {
@@ -74,6 +98,16 @@ export default function LabourPage() {
       setTotal(res.total);
     });
   }, [farmId, limit, offset]);
+
+  const refreshPayroll = useCallback(async () => {
+    if (!farmId) return;
+    await runLoaded(async () => {
+      const res = await apiFetch<PayrollListResponse>(
+        `/farms/${farmId}/labour/payroll?month=${encodeURIComponent(payrollMonth)}`
+      );
+      setPayroll(res);
+    });
+  }, [farmId, payrollMonth]);
 
   const refreshLedger = useCallback(async () => {
     if (!farmId || selectedId == null) return;
@@ -97,6 +131,18 @@ export default function LabourPage() {
   useEffect(() => {
     refresh().catch((e) => toastError(e));
   }, [refresh]);
+
+  useEffect(() => {
+    setPayoutDateInput(lastDayOfMonthLocal(payrollMonth));
+  }, [payrollMonth]);
+
+  useEffect(() => {
+    if (!farmId) {
+      setPayroll(null);
+      return;
+    }
+    refreshPayroll().catch((e) => toastError(e));
+  }, [farmId, refreshPayroll]);
 
   useEffect(() => {
     if (!farmId || !canManage) {
@@ -128,6 +174,105 @@ export default function LabourPage() {
     refreshLedger().catch((e) => toastError(e));
   }, [selectedId, ledgerOffset, refreshLedger]);
 
+  useEffect(() => {
+    const sel = rows.find((r) => r.id === selectedId);
+    if (sel?.default_rate != null) {
+      setMonthlySalaryInput(String(sel.default_rate));
+    } else {
+      setMonthlySalaryInput("");
+    }
+  }, [selectedId, rows]);
+
+  async function saveMonthlySalary() {
+    if (!farmId || selectedId == null || !canManage) return;
+    const v = monthlySalaryInput.trim();
+    const num = v === "" ? null : parseFloat(v);
+    if (num !== null && (Number.isNaN(num) || num < 0)) {
+      toastError(new Error("Enter a valid non-negative salary or leave empty."));
+      return;
+    }
+    try {
+      await runLoaded(async () => {
+        await apiFetch(`/farms/${farmId}/labour/${selectedId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ default_rate: num }),
+        });
+      });
+      toastSuccess("Monthly salary saved.");
+      await refresh();
+      await refreshPayroll();
+    } catch (err) {
+      toastError(err);
+    }
+  }
+
+  async function bookPayrollAccrual() {
+    if (!farmId || selectedId == null || !canManage) return;
+    const raw = accrueAmountInput.trim();
+    const body: Record<string, unknown> = {
+      labour_id: selectedId,
+      month: payrollMonth,
+    };
+    if (raw !== "") {
+      const amt = parseFloat(raw);
+      if (Number.isNaN(amt) || amt <= 0) {
+        toastError(new Error("Accrual amount must be positive."));
+        return;
+      }
+      body.amount = amt;
+    }
+    const sel = rows.find((x) => x.id === selectedId);
+    const q = sel && !sel.is_active ? "?force=true" : "";
+    try {
+      await runLoaded(async () => {
+        await apiFetch(`/farms/${farmId}/labour/payroll/accrue${q}`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+      });
+      toastSuccess("Salary booked for this month.");
+      setAccrueAmountInput("");
+      await refresh();
+      await refreshPayroll();
+      await refreshLedger();
+    } catch (err) {
+      toastError(err);
+    }
+  }
+
+  async function recordPayrollPayout(e: React.FormEvent) {
+    e.preventDefault();
+    if (!farmId || selectedId == null || !canManage) return;
+    const amt = parseFloat(payoutAmountInput);
+    if (Number.isNaN(amt) || amt <= 0) {
+      toastError(new Error("Enter a valid payout amount."));
+      return;
+    }
+    const sel = rows.find((x) => x.id === selectedId);
+    const q = sel && !sel.is_active ? "?force=true" : "";
+    try {
+      await runLoaded(async () => {
+        await apiFetch(`/farms/${farmId}/labour/payroll/payout${q}`, {
+          method: "POST",
+          body: JSON.stringify({
+            labour_id: selectedId,
+            month: payrollMonth,
+            amount: amt,
+            line_date: payoutDateInput,
+            description: null,
+          }),
+        });
+      });
+      toastSuccess("Payment recorded.");
+      setPayoutAmountInput("");
+      await refresh();
+      await refreshPayroll();
+      await refreshLedger();
+    } catch (err) {
+      toastError(err);
+    }
+  }
+
   async function createPerson(e: React.FormEvent) {
     e.preventDefault();
     if (!farmId || !canManage) return;
@@ -147,13 +292,14 @@ export default function LabourPage() {
           }),
         });
       });
-      toastSuccess("Person added.");
+      toastSuccess("Off-roll payee added.");
       setFullName("");
       setPhone("");
       setNotes("");
       setDefaultRate("");
       setLinkUserId("");
       await refresh();
+      await refreshPayroll();
     } catch (err) {
       toastError(err);
     }
@@ -170,6 +316,7 @@ export default function LabourPage() {
       });
       toastSuccess(r.is_active ? "Marked inactive." : "Reactivated.");
       await refresh();
+      await refreshPayroll();
       if (selectedId === r.id) await refreshLedger();
     } catch (err) {
       toastError(err);
@@ -203,6 +350,7 @@ export default function LabourPage() {
       setLineAmount("");
       setLineDesc("");
       await refresh();
+      await refreshPayroll();
       await refreshLedger();
     } catch (err) {
       toastError(err);
@@ -233,6 +381,7 @@ export default function LabourPage() {
       });
       toastSuccess("Link updated.");
       await refresh();
+      await refreshPayroll();
     } catch (err) {
       toastError(err);
     }
@@ -250,6 +399,7 @@ export default function LabourPage() {
       });
       toastSuccess("Line removed.");
       await refresh();
+      await refreshPayroll();
       await refreshLedger();
     } catch (err) {
       toastError(err);
@@ -261,21 +411,38 @@ export default function LabourPage() {
   }
 
   const selected = rows.find((r) => r.id === selectedId);
+  const selectedPayroll = payroll?.workers.find((w) => w.labour_id === selectedId) ?? null;
 
   return (
     <div className="space-y-8">
       {isWorker ? (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
-          This page shows <strong>your</strong> pay balance and ledger for this farm. If you see no
-          record, ask a manager to link your app account to your labour profile.
+          This page shows <strong>your</strong> pay balance for this farm. Worker accounts are
+          provisioned automatically when you are added as a farm worker.
         </div>
       ) : (
         <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/35 dark:text-amber-100">
-          <strong>Balances:</strong> positive means the farm still owes that person.{" "}
-          <strong>Earning</strong> increases what you owe; <strong>payment</strong> reduces it.{" "}
-          <strong>Adjustment</strong> moves the balance up or down (corrections, advances, write-offs).
+          <strong>Balances:</strong> positive means the farm still owes that person (running total on
+          the ledger). Use the month view to book a fixed salary and payouts;{" "}
+          <strong>Advanced</strong> has full ledger lines. Dashboard &quot;labour due&quot; uses
+          running balances, not a single month&apos;s accrual minus paid.
         </div>
       )}
+
+      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div>
+          <label className="text-sm text-zinc-600 dark:text-zinc-400">Payroll month</label>
+          <input
+            type="month"
+            className="mt-1 block rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            value={payrollMonth}
+            onChange={(e) => setPayrollMonth(e.target.value)}
+          />
+        </div>
+        {payroll ? (
+          <p className="max-w-xl text-xs text-zinc-500 dark:text-zinc-400">{payroll.labour_due_definition}</p>
+        ) : null}
+      </div>
 
       {isWorker && rows.length === 0 ? (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -288,7 +455,13 @@ export default function LabourPage() {
           onSubmit={createPerson}
           className="max-w-xl space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
         >
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add field staff or owner-pay line</h2>
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Add off-roll payee or owner-pay line
+          </h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Farm workers get a labour row automatically when invited as a worker. Use this for casual
+            staff without logins or owner compensation lines.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="text-sm text-zinc-600 dark:text-zinc-400">Full name</label>
@@ -489,8 +662,140 @@ export default function LabourPage() {
       {selectedId != null && selected ? (
         <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-zinc-950/40">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Ledger — {selected.full_name}
+            Payroll — {selected.full_name}
           </h2>
+          {selectedPayroll ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border border-zinc-100 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+                <p className="text-xs font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+                  This month (by line date)
+                </p>
+                <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                  Accrued (earnings): {fmtInr(selectedPayroll.month_accrued)}
+                </p>
+                <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                  Paid (payments): {fmtInr(selectedPayroll.month_paid)}
+                </p>
+                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  Net (month): {fmtInr(selectedPayroll.month_net)}
+                </p>
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  Booked payroll accrual:{" "}
+                  {selectedPayroll.payroll_accrual_posted
+                    ? fmtInr(selectedPayroll.payroll_accrual_amount ?? 0)
+                    : "not booked"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-zinc-100 p-4 dark:border-zinc-800">
+                <p className="text-xs font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+                  Running balance (all time)
+                </p>
+                <p className="mt-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  {fmtInr(selectedPayroll.balance_due)}
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {canManage ? (
+            <div className="space-y-4 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label className="text-sm text-zinc-600 dark:text-zinc-400">
+                    Monthly salary (contract)
+                  </label>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      className="min-w-[8rem] flex-1 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                      value={monthlySalaryInput}
+                      onChange={(e) => setMonthlySalaryInput(e.target.value)}
+                      placeholder="INR / month"
+                    />
+                    <button
+                      type="button"
+                      className="rounded-md bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-900 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                      onClick={() => void saveMonthlySalary()}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-zinc-600 dark:text-zinc-400">
+                    Book salary for {payrollMonth} (optional override)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                    value={accrueAmountInput}
+                    onChange={(e) => setAccrueAmountInput(e.target.value)}
+                    placeholder="Uses saved monthly salary if empty"
+                  />
+                  <button
+                    type="button"
+                    className="mt-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    onClick={() => void bookPayrollAccrual()}
+                  >
+                    Book salary accrual
+                  </button>
+                </div>
+              </div>
+              <form onSubmit={recordPayrollPayout} className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="text-sm text-zinc-600 dark:text-zinc-400">Payout (INR)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                    value={payoutAmountInput}
+                    onChange={(e) => setPayoutAmountInput(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-zinc-600 dark:text-zinc-400">
+                    Payment date (in this month)
+                  </label>
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                    value={payoutDateInput}
+                    onChange={(e) => setPayoutDateInput(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 sm:w-auto"
+                  >
+                    Record payment
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Your manager books monthly salary and records payouts. Expand advanced to see every
+              ledger line.
+            </p>
+          )}
+          <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            <button
+              type="button"
+              className="text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-400"
+              onClick={() => setAdvancedOpen((o) => !o)}
+            >
+              {advancedOpen ? "Hide" : "Show"} advanced ledger
+            </button>
+          </div>
+          {advancedOpen ? (
+            <>
           {canManage ? (
             <form onSubmit={addLedgerLine} className="grid max-w-2xl gap-3 sm:grid-cols-2">
               <div>
@@ -543,6 +848,13 @@ export default function LabourPage() {
                   onChange={(e) => setLineDesc(e.target.value)}
                 />
               </div>
+              {lineType === "payment" ? (
+                <p className="sm:col-span-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  Payments are always recorded in the expense log for profit (Labour &amp; wages). To pay
+                  someone not on this list, use Expenses → Labour &amp; wages and choose them from the
+                  dropdown.
+                </p>
+              ) : null}
               {!selected.is_active ? (
                 <label className="flex cursor-pointer items-center gap-2 sm:col-span-2">
                   <input
@@ -565,7 +877,9 @@ export default function LabourPage() {
               </div>
             </form>
           ) : (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Managers can post payments and earnings.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Your earnings, payments, and adjustments are listed below.
+            </p>
           )}
 
           <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
@@ -577,6 +891,7 @@ export default function LabourPage() {
                     <th className="px-3 py-2">Type</th>
                     <th className="px-3 py-2">Amount</th>
                     <th className="px-3 py-2">Note</th>
+                    <th className="px-3 py-2">P&amp;L</th>
                     {canManage ? <th className="px-3 py-2" /> : null}
                   </tr>
                 </thead>
@@ -594,6 +909,15 @@ export default function LabourPage() {
                         {fmtInr(L.amount)}
                       </td>
                       <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{L.description ?? "—"}</td>
+                      <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
+                        {L.linked_expense_id != null ? (
+                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200">
+                            Expense #{L.linked_expense_id}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       {canManage ? (
                         <td className="px-3 py-2">
                           <button
@@ -619,6 +943,8 @@ export default function LabourPage() {
               onLimitChange={setLedgerLimit}
               onOffsetChange={setLedgerOffset}
             />
+          ) : null}
+            </>
           ) : null}
         </div>
       ) : null}

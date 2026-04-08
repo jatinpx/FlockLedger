@@ -9,7 +9,7 @@ from app.api.farm_access import require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
-from app.models import FeedInventory
+from app.models import Expense, FeedInventory
 from app.schemas.pagination import Paginated
 from app.schemas.production import FeedInventoryCreate, FeedInventoryOut, FeedInventoryUpdate
 from app.services.audit_service import record_audit
@@ -29,6 +29,7 @@ MANAGER_ROLES = ("owner", "manager")
 
 def _to_out(r: FeedInventory) -> FeedInventoryOut:
     opening = opening_for_existing_row(r)
+    pc = float(r.purchase_cost_inr) if r.purchase_cost_inr is not None else None
     return FeedInventoryOut(
         id=r.id,
         farm_id=r.farm_id,
@@ -36,6 +37,7 @@ def _to_out(r: FeedInventory) -> FeedInventoryOut:
         feed_received=float(r.feed_received),
         feed_used=float(r.feed_used),
         feed_remaining=float(r.feed_remaining),
+        purchase_cost_inr=pc,
         opening_balance_kg=float(opening),
         remaining_auto=not r.remaining_manual,
         created_at=r.created_at,
@@ -49,6 +51,7 @@ def _row_dict(r: FeedInventory) -> dict:
         "feed_used": float(r.feed_used),
         "feed_remaining": float(r.feed_remaining),
         "remaining_manual": r.remaining_manual,
+        "purchase_cost_inr": float(r.purchase_cost_inr) if r.purchase_cost_inr is not None else None,
     }
 
 
@@ -85,6 +88,9 @@ def create_feed_entry(
         rem = compute_remaining_kg(opening, recv, used)
         manual = False
     validate_non_negative_remaining(rem)
+    pc: Decimal | None = None
+    if body.purchase_cost_inr is not None:
+        pc = Decimal(str(body.purchase_cost_inr))
     row = FeedInventory(
         farm_id=farm_id,
         date=body.date,
@@ -92,6 +98,7 @@ def create_feed_entry(
         feed_used=used,
         feed_remaining=rem,
         remaining_manual=manual,
+        purchase_cost_inr=pc,
     )
     db.add(row)
     db.flush()
@@ -152,6 +159,22 @@ def patch_feed_entry(
         row.remaining_manual = False
         validate_non_negative_remaining(row.feed_remaining)
 
+    if "purchase_cost_inr" in data:
+        if data["purchase_cost_inr"] is not None:
+            linked = (
+                db.query(Expense)
+                .filter(Expense.feed_inventory_id == record_id)
+                .first()
+            )
+            if linked:
+                raise HTTPException(
+                    status_code=400,
+                    detail="This feed row has a linked expense entry; remove or edit that expense instead of setting purchase cost here.",
+                )
+            row.purchase_cost_inr = Decimal(str(data["purchase_cost_inr"]))
+        else:
+            row.purchase_cost_inr = None
+
     after = _row_dict(row)
     record_audit(
         db,
@@ -208,6 +231,11 @@ def delete_feed(
     )
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
+    if db.query(Expense).filter(Expense.feed_inventory_id == record_id).first():
+        raise HTTPException(
+            status_code=400,
+            detail="Delete the linked expense for this feed row first.",
+        )
     before = _row_dict(row)
     record_audit(
         db,

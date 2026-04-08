@@ -7,13 +7,20 @@ import { useAsyncLoader } from "@/lib/loading-context";
 import {
   apiFetch,
   fetchExpenseCategories,
+  LABOUR_WAGES_CATEGORY,
   MISCELLANEOUS_EXPENSE_CATEGORY,
   type ExpenseRow,
+  type FarmLabourRow,
   type Paginated,
 } from "@/lib/api";
+import { pageQuery } from "@/lib/pagination";
 import { toastError, toastSuccess } from "@/lib/toast";
 
 const DEFAULT_LIMIT = 25;
+
+function expenseIsLinked(r: ExpenseRow): boolean {
+  return r.labour_ledger_line_id != null || r.feed_inventory_id != null;
+}
 
 function categoryOptionsWithLegacy(predefined: string[], current: string): string[] {
   if (current && !predefined.includes(current)) {
@@ -36,6 +43,9 @@ export default function ExpensesPage() {
   const [date, setDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
+  /** Farm labour row id when category is Labour & wages (creates payment + link). */
+  const [wageLabourId, setWageLabourId] = useState("");
+  const [activeLabour, setActiveLabour] = useState<FarmLabourRow[]>([]);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editCategory, setEditCategory] = useState("");
@@ -73,6 +83,30 @@ export default function ExpensesPage() {
     setCategory((prev) => (categories.includes(prev) ? prev : categories[0]));
   }, [categories]);
 
+  useEffect(() => {
+    if (category !== LABOUR_WAGES_CATEGORY) setWageLabourId("");
+  }, [category]);
+
+  useEffect(() => {
+    if (!farmId) {
+      setActiveLabour([]);
+      return;
+    }
+    let cancelled = false;
+    apiFetch<Paginated<FarmLabourRow>>(
+      `/farms/${farmId}/labour?${pageQuery(500, 0)}&active_only=true`
+    )
+      .then((res) => {
+        if (!cancelled) setActiveLabour(res.items.filter((r) => r.is_active));
+      })
+      .catch(() => {
+        if (!cancelled) setActiveLabour([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [farmId]);
+
   const miscNeedsDescription = category === MISCELLANEOUS_EXPENSE_CATEGORY;
   const editMiscNeedsDescription = editCategory === MISCELLANEOUS_EXPENSE_CATEGORY;
 
@@ -86,19 +120,25 @@ export default function ExpensesPage() {
     }
     try {
       await runLoaded(async () => {
+        const body: Record<string, unknown> = {
+          category,
+          amount: parseFloat(amount),
+          description: descTrim ? descTrim : null,
+          date,
+        };
+        if (category === LABOUR_WAGES_CATEGORY && wageLabourId.trim()) {
+          const lid = parseInt(wageLabourId, 10);
+          if (!Number.isNaN(lid)) body.labour_id = lid;
+        }
         await apiFetch(`/farms/${farmId}/expenses`, {
           method: "POST",
-          body: JSON.stringify({
-            category,
-            amount: parseFloat(amount),
-            description: descTrim ? descTrim : null,
-            date,
-          }),
+          body: JSON.stringify(body),
         });
       });
       toastSuccess("Expense saved.");
       setAmount("");
       setDescription("");
+      setWageLabourId("");
       await refresh();
     } catch (err) {
       toastError(err);
@@ -106,6 +146,14 @@ export default function ExpensesPage() {
   }
 
   function startEdit(r: ExpenseRow) {
+    if (expenseIsLinked(r)) {
+      toastError(
+        new Error(
+          "This row is linked to labour or feed. Remove it from the Labour ledger (or delete the linked expense from feed rules) before editing here."
+        )
+      );
+      return;
+    }
     setEditingId(r.id);
     setEditCategory(r.category);
     setEditAmount(String(r.amount));
@@ -157,7 +205,9 @@ export default function ExpensesPage() {
       >
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add expense</h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Managers and owners can add expenses. Workers can view the list.
+          Managers and owners can add expenses. Workers can view the list. For{" "}
+          <strong>Labour &amp; wages</strong>, choose a worker to record a payment and link this expense.
+          Feed purchase cost can be set on the Feed page.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -221,6 +271,29 @@ export default function ExpensesPage() {
               required
             />
           </div>
+          {category === LABOUR_WAGES_CATEGORY ? (
+            <div className="sm:col-span-2">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">
+                Pay to (active workers)
+              </label>
+              <select
+                className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                value={wageLabourId}
+                onChange={(e) => setWageLabourId(e.target.value)}
+              >
+                <option value="">— Not linked (e.g. outside contractor) —</option>
+                {activeLabour.map((L) => (
+                  <option key={L.id} value={String(L.id)}>
+                    {L.full_name}
+                    {L.personnel_kind === "owner_pay" ? " (owner pay)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                If you select someone, a labour payment is created and their balance updates.
+              </p>
+            </div>
+          ) : null}
         </div>
         <button
           type="submit"
@@ -240,6 +313,8 @@ export default function ExpensesPage() {
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Note</th>
+                <th className="px-4 py-3">Worker</th>
+                <th className="px-4 py-3">Link</th>
                 <th className="w-24 px-4 py-3" />
               </tr>
             </thead>
@@ -295,6 +370,8 @@ export default function ExpensesPage() {
                         }
                       />
                     </td>
+                    <td className="px-4 py-2 align-top text-xs text-zinc-400">—</td>
+                    <td className="px-4 py-2 align-top text-xs text-zinc-400">—</td>
                     <td className="whitespace-nowrap px-4 py-2 align-top">
                       <button
                         type="button"
@@ -318,11 +395,28 @@ export default function ExpensesPage() {
                     <td className="px-4 py-3">{r.category}</td>
                     <td className="px-4 py-3">{fmt(r.amount)}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{r.description ?? "—"}</td>
+                    <td className="px-4 py-3 text-xs text-zinc-700 dark:text-zinc-300">
+                      {r.linked_labour_name ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-400">
+                      {r.labour_ledger_line_id != null ? (
+                        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-violet-900 dark:bg-violet-950/50 dark:text-violet-200">
+                          Labour
+                        </span>
+                      ) : r.feed_inventory_id != null ? (
+                        <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-900 dark:bg-sky-950/50 dark:text-sky-200">
+                          Feed
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
-                        className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
+                        className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
                         onClick={() => startEdit(r)}
+                        disabled={expenseIsLinked(r)}
                       >
                         Edit
                       </button>

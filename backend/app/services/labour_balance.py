@@ -18,7 +18,12 @@ def ledger_balance(db: Session, labour_id: int) -> Decimal:
 
 
 def farm_labour_due_total(db: Session, farm_id: int) -> Decimal:
-    """Sum of max(balance, 0) for each person (amounts farm still owes)."""
+    """Sum of max(running_ledger_balance, 0) per labour row (not month accrual minus paid).
+
+    Running balance is earnings minus payments plus adjustments across all time. The payroll
+    month view uses calendar-month slices for display only; dashboard labour due stays aligned
+    with this total so it matches what workers are owed in aggregate after all ledger activity.
+    """
     labours = db.query(FarmLabour).filter(FarmLabour.farm_id == farm_id).all()
     total = Decimal("0")
     for L in labours:

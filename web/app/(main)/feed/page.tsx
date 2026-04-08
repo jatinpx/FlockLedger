@@ -24,6 +24,7 @@ export default function FeedPage() {
   const [openingPreview, setOpeningPreview] = useState<number | null>(null);
   const [overrideRemaining, setOverrideRemaining] = useState(false);
   const [remainingOverride, setRemainingOverride] = useState("");
+  const [purchaseCost, setPurchaseCost] = useState("");
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState("");
@@ -31,6 +32,7 @@ export default function FeedPage() {
   const [editUsed, setEditUsed] = useState("");
   const [editRemaining, setEditRemaining] = useState("");
   const [editOverride, setEditOverride] = useState(false);
+  const [editPurchaseCost, setEditPurchaseCost] = useState("");
 
   const refresh = useCallback(async () => {
     if (!farmId) return;
@@ -89,6 +91,10 @@ export default function FeedPage() {
         if (overrideRemaining) {
           body.feed_remaining = parseFloat(remainingOverride);
         }
+        const pc = parseFloat(purchaseCost);
+        if (purchaseCost.trim() !== "" && Number.isFinite(pc)) {
+          body.purchase_cost_inr = pc;
+        }
         await apiFetch(`/farms/${farmId}/feed`, {
           method: "POST",
           body: JSON.stringify(body),
@@ -99,6 +105,7 @@ export default function FeedPage() {
       setUsed("");
       setOverrideRemaining(false);
       setRemainingOverride("");
+      setPurchaseCost("");
       await refresh();
     } catch (err) {
       toastError(err);
@@ -112,6 +119,11 @@ export default function FeedPage() {
     setEditUsed(String(r.feed_used));
     setEditRemaining(String(r.feed_remaining));
     setEditOverride(r.remaining_auto === false);
+    setEditPurchaseCost(
+      r.purchase_cost_inr != null && r.purchase_cost_inr !== undefined
+        ? String(r.purchase_cost_inr)
+        : ""
+    );
   }
 
   async function saveEdit() {
@@ -126,6 +138,9 @@ export default function FeedPage() {
         if (editOverride) {
           body.feed_remaining = parseFloat(editRemaining);
         }
+        const epc = parseFloat(editPurchaseCost);
+        body.purchase_cost_inr =
+          editPurchaseCost.trim() === "" ? null : Number.isFinite(epc) ? epc : null;
         await apiFetch(`/farms/${farmId}/feed/${editingId}`, {
           method: "PATCH",
           body: JSON.stringify(body),
@@ -152,7 +167,8 @@ export default function FeedPage() {
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Feed inventory entry</h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Remaining is calculated as opening stock + received − used. Use a manual remaining only
-          for physical count corrections.
+          for physical count corrections. Optional <strong>purchase cost (₹)</strong> counts toward
+          profit without a separate expense entry.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
@@ -223,6 +239,20 @@ export default function FeedPage() {
               />
             </div>
           )}
+          <div>
+            <label className="text-sm text-zinc-600 dark:text-zinc-400">
+              Purchase cost (₹, optional)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+              value={purchaseCost}
+              onChange={(e) => setPurchaseCost(e.target.value)}
+              placeholder="e.g. feed bill for this receipt"
+            />
+          </div>
         </div>
         <button
           type="submit"
@@ -242,6 +272,7 @@ export default function FeedPage() {
                 <th className="px-4 py-3">Received</th>
                 <th className="px-4 py-3">Used</th>
                 <th className="px-4 py-3">Remaining</th>
+                <th className="px-4 py-3">Cost ₹</th>
                 <th className="px-4 py-3">Auto</th>
                 <th className="w-24 px-4 py-3" />
               </tr>
@@ -293,13 +324,24 @@ export default function FeedPage() {
                       />
                     </td>
                     <td className="px-4 py-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        className="w-20 rounded border border-zinc-200 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                        value={editPurchaseCost}
+                        onChange={(e) => setEditPurchaseCost(e.target.value)}
+                        placeholder="₹"
+                      />
+                    </td>
+                    <td className="px-4 py-2">
                       <label className="flex items-center gap-1 text-xs">
                         <input
                           type="checkbox"
                           checked={editOverride}
                           onChange={(e) => setEditOverride(e.target.checked)}
                         />
-                        manual
+                        manual rem.
                       </label>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2">
@@ -328,6 +370,14 @@ export default function FeedPage() {
                     <td className="px-4 py-3">{r.feed_received}</td>
                     <td className="px-4 py-3">{r.feed_used}</td>
                     <td className="px-4 py-3">{r.feed_remaining}</td>
+                    <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                      {r.purchase_cost_inr != null && r.purchase_cost_inr !== undefined
+                        ? new Intl.NumberFormat(undefined, {
+                            style: "currency",
+                            currency: "INR",
+                          }).format(r.purchase_cost_inr)
+                        : "—"}
+                    </td>
                     <td className="px-4 py-3">{r.remaining_auto !== false ? "Yes" : "No"}</td>
                     <td className="px-4 py-3">
                       <button

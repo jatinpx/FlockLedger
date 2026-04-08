@@ -1,7 +1,7 @@
 from datetime import date as Date
 from datetime import datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class EggProductionCreate(BaseModel):
@@ -40,6 +40,11 @@ class FeedInventoryCreate(BaseModel):
         ge=0,
         description="If omitted, remaining = opening + received - used (opening from last entry).",
     )
+    purchase_cost_inr: float | None = Field(
+        None,
+        ge=0,
+        description="Optional cash paid for feed received (counts toward P&L; no separate expense needed).",
+    )
 
 
 class FeedInventoryOut(BaseModel):
@@ -49,6 +54,7 @@ class FeedInventoryOut(BaseModel):
     feed_received: float
     feed_used: float
     feed_remaining: float
+    purchase_cost_inr: float | None = None
     opening_balance_kg: float = Field(
         ...,
         description="Stock kg at start of this row (before received/used).",
@@ -71,6 +77,17 @@ class FeedInventoryUpdate(BaseModel):
         ge=0,
         description="Set to override auto; omit with received/used change to recompute.",
     )
+    purchase_cost_inr: float | None = Field(
+        None,
+        description="Set to null in JSON to clear purchase cost on this row.",
+    )
+
+    @field_validator("purchase_cost_inr")
+    @classmethod
+    def purchase_cost_nonneg(cls, v: float | None) -> float | None:
+        if v is not None and v < 0:
+            raise ValueError("purchase_cost_inr must be >= 0")
+        return v
 
 
 class EggProductionPatch(BaseModel):

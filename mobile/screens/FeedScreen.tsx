@@ -17,6 +17,9 @@ import { PaginatedControls } from "../components/PaginatedControls";
 
 const DEFAULT_LIMIT = 25;
 
+const fmtInr = (n: number) =>
+  new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
+
 export function FeedScreen() {
   const { farmId } = useFarm();
   const [rows, setRows] = useState<FeedRow[]>([]);
@@ -29,12 +32,14 @@ export function FeedScreen() {
   const [openingPreview, setOpeningPreview] = useState<number | null>(null);
   const [overrideRemaining, setOverrideRemaining] = useState(false);
   const [remainingOverride, setRemainingOverride] = useState("");
+  const [purchaseCost, setPurchaseCost] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editReceived, setEditReceived] = useState("");
   const [editUsed, setEditUsed] = useState("");
   const [editRemaining, setEditRemaining] = useState("");
   const [editOverride, setEditOverride] = useState(false);
+  const [editPurchaseCost, setEditPurchaseCost] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -100,6 +105,10 @@ export function FeedScreen() {
       if (overrideRemaining) {
         body.feed_remaining = parseFloat(remainingOverride);
       }
+      const pc = parseFloat(purchaseCost);
+      if (purchaseCost.trim() !== "" && Number.isFinite(pc)) {
+        body.purchase_cost_inr = pc;
+      }
       await apiFetch(`/farms/${farmId}/feed`, {
         method: "POST",
         body: JSON.stringify(body),
@@ -108,6 +117,7 @@ export function FeedScreen() {
       setUsed("");
       setOverrideRemaining(false);
       setRemainingOverride("");
+      setPurchaseCost("");
       await refresh();
     } finally {
       setSaving(false);
@@ -121,6 +131,11 @@ export function FeedScreen() {
     setEditUsed(String(r.feed_used));
     setEditRemaining(String(r.feed_remaining));
     setEditOverride(r.remaining_auto === false);
+    setEditPurchaseCost(
+      r.purchase_cost_inr != null && r.purchase_cost_inr !== undefined
+        ? String(r.purchase_cost_inr)
+        : ""
+    );
   }
 
   async function saveEdit() {
@@ -135,6 +150,9 @@ export function FeedScreen() {
       if (editOverride) {
         body.feed_remaining = parseFloat(editRemaining);
       }
+      const epc = parseFloat(editPurchaseCost);
+      body.purchase_cost_inr =
+        editPurchaseCost.trim() === "" ? null : Number.isFinite(epc) ? epc : null;
       await apiFetch(`/farms/${farmId}/feed/${editingId}`, {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -158,7 +176,8 @@ export function FeedScreen() {
       <View style={styles.card}>
         <Text style={styles.h2}>Add feed entry</Text>
         <Text style={styles.hint}>
-          Remaining is opening + received − used unless you override with a physical count.
+          Remaining is opening + received − used unless you override with a physical count. Optional
+          purchase cost (₹) counts toward profit without a separate expense.
         </Text>
         <Text style={styles.label}>Date</Text>
         <TextInput style={styles.input} value={date} onChangeText={setDate} />
@@ -201,6 +220,14 @@ export function FeedScreen() {
             />
           </>
         ) : null}
+        <Text style={styles.label}>Purchase cost (₹, optional)</Text>
+        <TextInput
+          style={styles.input}
+          value={purchaseCost}
+          onChangeText={setPurchaseCost}
+          keyboardType="decimal-pad"
+          placeholder="Feed bill for this receipt"
+        />
         <Pressable style={[styles.btn, saving && styles.btnDis]} onPress={submit} disabled={saving}>
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save</Text>}
         </Pressable>
@@ -234,6 +261,14 @@ export function FeedScreen() {
               keyboardType="decimal-pad"
               editable={editOverride}
             />
+            <Text style={styles.label}>Cost ₹ (optional)</Text>
+            <TextInput
+              style={styles.inputSm}
+              value={editPurchaseCost}
+              onChangeText={setEditPurchaseCost}
+              keyboardType="decimal-pad"
+              placeholder="Clear field to remove"
+            />
             <View style={styles.switchRow}>
               <Text style={styles.switchLabelSm}>Manual remaining</Text>
               <Switch value={editOverride} onValueChange={setEditOverride} />
@@ -254,6 +289,9 @@ export function FeedScreen() {
               Open {(r.opening_balance_kg ?? 0).toFixed(2)} · In {r.feed_received.toFixed(2)} · Used{" "}
               {r.feed_used.toFixed(2)} · Rem {r.feed_remaining.toFixed(2)} kg
               {r.remaining_auto !== false ? " (auto)" : " (manual)"}
+              {r.purchase_cost_inr != null && r.purchase_cost_inr !== undefined
+                ? ` · Cost ${fmtInr(r.purchase_cost_inr)}`
+                : ""}
             </Text>
             <Pressable onPress={() => startEdit(r)}>
               <Text style={styles.link}>Edit</Text>

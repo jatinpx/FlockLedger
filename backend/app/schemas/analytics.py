@@ -27,8 +27,14 @@ class DashboardSummary(BaseModel):
     period_trays: int
     total_birds: int
     tray_stock: dict
-    labour_due_total: float = 0
-    """Sum of positive balances owed to field staff / owner-pay lines."""
+    labour_due_total: float = Field(
+        0,
+        description=(
+            "Sum over all labour rows of max(0, running ledger balance): cumulative earnings "
+            "minus payments plus adjustments. Not the same as “accrual minus paid” for a single "
+            "calendar month (see GET /farms/{farm_id}/labour/payroll)."
+        ),
+    )
     flock_mortality_total: int = 0
     flock_birds_added_total: int = 0
     flock_birds_removed_total: int = 0
@@ -43,6 +49,15 @@ class ProfitPoint(BaseModel):
     profit: float
 
 
+class ProfitExpenseBreakdown(BaseModel):
+    """How P&L expenses are composed (sums to the same value as `expenses`)."""
+
+    expense_entries: float
+    unlinked_labour_payments: float
+    feed_purchase_cost_on_entries: float
+    total: float
+
+
 class ProfitSummaryOut(BaseModel):
     period_start: str
     period_end: str
@@ -51,3 +66,4 @@ class ProfitSummaryOut(BaseModel):
     profit: float
     cost_per_egg: float | None
     usable_eggs_in_period: int = 0
+    expense_breakdown: ProfitExpenseBreakdown

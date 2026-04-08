@@ -11,7 +11,13 @@ import {
   Switch,
 } from "react-native";
 import { useFarm } from "../lib/farm-context";
-import { apiFetch, type FarmLabourRow, type LabourLedgerRow, type Paginated } from "../lib/api";
+import {
+  apiFetch,
+  type FarmLabourRow,
+  type LabourLedgerRow,
+  type Paginated,
+  type PayrollListResponse,
+} from "../lib/api";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
@@ -20,6 +26,21 @@ const LEDGER_DEFAULT = 50;
 
 const fmtInr = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
+
+function ymNow(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function lastDayOfMonthLocal(ym: string): string {
+  const [ys, ms] = ym.split("-");
+  const y = Number(ys);
+  const m = Number(ms);
+  const d = new Date(y, m, 0);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
 
 export function LabourScreen() {
   const { farms, farmId } = useFarm();
@@ -56,6 +77,26 @@ export function LabourScreen() {
   const [lineDesc, setLineDesc] = useState("");
   const [forceInactive, setForceInactive] = useState(false);
 
+  const [payrollMonth, setPayrollMonth] = useState(ymNow);
+  const [payroll, setPayroll] = useState<PayrollListResponse | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [monthlySalaryInput, setMonthlySalaryInput] = useState("");
+  const [accrueAmountInput, setAccrueAmountInput] = useState("");
+  const [payoutAmountInput, setPayoutAmountInput] = useState("");
+  const [payoutDateInput, setPayoutDateInput] = useState(() => lastDayOfMonthLocal(ymNow()));
+
+  const loadPayroll = useCallback(async () => {
+    if (!farmId) return;
+    try {
+      const res = await apiFetch<PayrollListResponse>(
+        `/farms/${farmId}/labour/payroll?month=${encodeURIComponent(payrollMonth)}`
+      );
+      setPayroll(res);
+    } catch {
+      setPayroll(null);
+    }
+  }, [farmId, payrollMonth]);
+
   const refresh = useCallback(async () => {
     if (!farmId) return;
     setLoading(true);
@@ -71,7 +112,8 @@ export function LabourScreen() {
     } finally {
       setLoading(false);
     }
-  }, [farmId, limit, offset]);
+    await loadPayroll();
+  }, [farmId, limit, offset, loadPayroll]);
 
   const refreshLedger = useCallback(async () => {
     if (!farmId || selectedId == null) return;
@@ -96,6 +138,10 @@ export function LabourScreen() {
   }, [refresh]);
 
   useEffect(() => {
+    setPayoutDateInput(lastDayOfMonthLocal(payrollMonth));
+  }, [payrollMonth]);
+
+  useEffect(() => {
     if (canManage || !isWorker) return;
     if (rows.length === 1 && selectedId == null) {
       setSelectedId(rows[0].id);
@@ -114,6 +160,83 @@ export function LabourScreen() {
     }
     refreshLedger();
   }, [selectedId, ledgerOffset, refreshLedger]);
+
+  useEffect(() => {
+    const sel = rows.find((r) => r.id === selectedId);
+    if (sel?.default_rate != null) {
+      setMonthlySalaryInput(String(sel.default_rate));
+    } else {
+      setMonthlySalaryInput("");
+    }
+  }, [selectedId, rows]);
+
+  async function saveMonthlySalary() {
+    if (!farmId || selectedId == null || !canManage) return;
+    const v = monthlySalaryInput.trim();
+    const num = v === "" ? null : parseFloat(v);
+    if (num !== null && (Number.isNaN(num) || num < 0)) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/farms/${farmId}/labour/${selectedId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ default_rate: num }),
+      });
+      await refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function bookPayrollAccrual() {
+    if (!farmId || selectedId == null || !canManage) return;
+    const raw = accrueAmountInput.trim();
+    const body: Record<string, unknown> = { labour_id: selectedId, month: payrollMonth };
+    if (raw !== "") {
+      const amt = parseFloat(raw);
+      if (Number.isNaN(amt) || amt <= 0) return;
+      body.amount = amt;
+    }
+    const sel = rows.find((x) => x.id === selectedId);
+    const q = sel && !sel.is_active ? "?force=true" : "";
+    setSaving(true);
+    try {
+      await apiFetch(`/farms/${farmId}/labour/payroll/accrue${q}`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setAccrueAmountInput("");
+      await refresh();
+      await refreshLedger();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function recordPayrollPayout() {
+    if (!farmId || selectedId == null || !canManage) return;
+    const amt = parseFloat(payoutAmountInput);
+    if (Number.isNaN(amt) || amt <= 0) return;
+    const sel = rows.find((x) => x.id === selectedId);
+    const q = sel && !sel.is_active ? "?force=true" : "";
+    setSaving(true);
+    try {
+      await apiFetch(`/farms/${farmId}/labour/payroll/payout${q}`, {
+        method: "POST",
+        body: JSON.stringify({
+          labour_id: selectedId,
+          month: payrollMonth,
+          amount: amt,
+          line_date: payoutDateInput,
+          description: null,
+        }),
+      });
+      setPayoutAmountInput("");
+      await refresh();
+      await refreshLedger();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function createPerson() {
     if (!farmId || !canManage) return;
@@ -201,6 +324,7 @@ export function LabourScreen() {
   }
 
   const selected = rows.find((r) => r.id === selectedId);
+  const selectedPayroll = payroll?.workers.find((w) => w.labour_id === selectedId) ?? null;
 
   return (
     <ScrollView
@@ -210,10 +334,22 @@ export function LabourScreen() {
       <View style={[styles.callout, isWorker && styles.calloutWorker]}>
         <Text style={[styles.calloutText, isWorker && styles.calloutTextWorker]}>
           {isWorker
-            ? "This is your pay balance and ledger for this farm. If nothing appears, ask a manager to link your app login to your labour record."
-            : "Positive balance = farm owes them. Earning adds debt; payment reduces it. Adjustment can be + or − for corrections."}
+            ? "Your pay balance for this farm. Worker accounts get a labour row automatically when you are added as a worker."
+            : "Running balance = all-time ledger total. Use the month field for salary accrual and payouts; open Advanced for raw ledger lines. Dashboard labour due uses running balances."}
         </Text>
       </View>
+
+      <Text style={styles.label}>Payroll month (YYYY-MM)</Text>
+      <TextInput
+        style={styles.input}
+        value={payrollMonth}
+        onChangeText={setPayrollMonth}
+        placeholder="2026-04"
+        autoCapitalize="none"
+      />
+      {payroll ? (
+        <Text style={styles.mutedSm}>{payroll.labour_due_definition}</Text>
+      ) : null}
 
       {isWorker && rows.length === 0 ? (
         <Text style={styles.mutedSm}>No labour record is linked to your account for this farm yet.</Text>
@@ -221,7 +357,11 @@ export function LabourScreen() {
 
       {canManage ? (
         <View style={styles.card}>
-          <Text style={styles.h2}>Add person</Text>
+          <Text style={styles.h2}>Add off-roll payee</Text>
+          <Text style={styles.mutedSm}>
+            Workers with app logins are added automatically when invited as a worker. Use this for
+            casual staff without accounts or owner-pay lines.
+          </Text>
           <Text style={styles.label}>Full name</Text>
           <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
           <Text style={styles.label}>Phone</Text>
@@ -304,9 +444,81 @@ export function LabourScreen() {
 
       {selectedId != null && selected ? (
         <View style={styles.card}>
-          <Text style={styles.h2}>Ledger — {selected.full_name}</Text>
+          <Text style={styles.h2}>Payroll — {selected.full_name}</Text>
+          {selectedPayroll ? (
+            <>
+              <Text style={styles.rowSub}>
+                Month {selectedPayroll.month}: accrued {fmtInr(selectedPayroll.month_accrued)} · paid{" "}
+                {fmtInr(selectedPayroll.month_paid)} · net {fmtInr(selectedPayroll.month_net)}
+              </Text>
+              <Text style={styles.rowSub}>
+                Booked accrual:{" "}
+                {selectedPayroll.payroll_accrual_posted
+                  ? fmtInr(selectedPayroll.payroll_accrual_amount ?? 0)
+                  : "no"}
+              </Text>
+              <Text style={styles.rowMain}>Running balance: {fmtInr(selectedPayroll.balance_due)}</Text>
+            </>
+          ) : null}
           {canManage ? (
             <>
+              <Text style={styles.label}>Monthly salary (INR)</Text>
+              <TextInput
+                style={styles.input}
+                value={monthlySalaryInput}
+                onChangeText={setMonthlySalaryInput}
+                keyboardType="decimal-pad"
+              />
+              <Pressable
+                style={[styles.btnSecondary, saving && styles.btnDis]}
+                onPress={() => void saveMonthlySalary()}
+                disabled={saving}
+              >
+                <Text style={styles.btnSecondaryText}>Save monthly salary</Text>
+              </Pressable>
+              <Text style={styles.label}>Accrual override (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={accrueAmountInput}
+                onChangeText={setAccrueAmountInput}
+                keyboardType="decimal-pad"
+                placeholder="Uses salary if empty"
+              />
+              <Pressable
+                style={[styles.btn, saving && styles.btnDis]}
+                onPress={() => void bookPayrollAccrual()}
+                disabled={saving}
+              >
+                <Text style={styles.btnText}>Book salary accrual</Text>
+              </Pressable>
+              <Text style={styles.label}>Payout amount</Text>
+              <TextInput
+                style={styles.input}
+                value={payoutAmountInput}
+                onChangeText={setPayoutAmountInput}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.label}>Payment date (in month)</Text>
+              <TextInput style={styles.input} value={payoutDateInput} onChangeText={setPayoutDateInput} />
+              <Pressable
+                style={[styles.btn, saving && styles.btnDis]}
+                onPress={() => void recordPayrollPayout()}
+                disabled={saving}
+              >
+                <Text style={styles.btnText}>Record payment</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.mutedSm}>Open Advanced to see all ledger lines.</Text>
+          )}
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Advanced ledger</Text>
+            <Switch value={showAdvanced} onValueChange={setShowAdvanced} />
+          </View>
+          {showAdvanced ? (
+            <>
+              {canManage ? (
+                <>
               <Text style={styles.label}>Type</Text>
               <View style={styles.rowChips}>
                 {(
@@ -336,6 +548,12 @@ export function LabourScreen() {
               <TextInput style={styles.input} value={lineDate} onChangeText={setLineDate} />
               <Text style={styles.label}>Description</Text>
               <TextInput style={styles.input} value={lineDesc} onChangeText={setLineDesc} />
+              {lineType === "payment" ? (
+                <Text style={styles.mutedSm}>
+                  Payments are always added to the expense log for profit. To pay someone not listed
+                  here, use Expenses → Labour &amp; wages and select them there.
+                </Text>
+              ) : null}
               {!selected.is_active ? (
                 <View style={styles.switchRow}>
                   <Text style={styles.switchLabel}>Post for inactive</Text>
@@ -353,19 +571,16 @@ export function LabourScreen() {
                   <Text style={styles.btnText}>Add line</Text>
                 )}
               </Pressable>
-            </>
-          ) : (
-            <Text style={styles.mutedSm}>
-              {isWorker
-                ? "Your earnings and payments are listed below."
-                : "Managers can post ledger lines."}
-            </Text>
-          )}
+                </>
+              ) : (
+                <Text style={styles.mutedSm}>Your ledger lines are listed below.</Text>
+              )}
 
           {ledgerRows.map((L) => (
             <View key={L.id} style={styles.ledgerRow}>
               <Text style={styles.ledgerMain}>
                 {L.line_date} · {L.line_type} · {fmtInr(L.amount)}
+                {L.linked_expense_id != null ? " · P&L linked" : ""}
               </Text>
               {L.description ? <Text style={styles.rowSub}>{L.description}</Text> : null}
               {canManage ? (
@@ -383,6 +598,8 @@ export function LabourScreen() {
               onLimitChange={setLedgerLimit}
               onOffsetChange={setLedgerOffset}
             />
+          ) : null}
+            </>
           ) : null}
         </View>
       ) : null}
@@ -447,6 +664,14 @@ const styles = StyleSheet.create({
   },
   btnDis: { opacity: 0.7 },
   btnText: { color: "#fff", fontWeight: "600" },
+  btnSecondary: {
+    marginTop: 8,
+    backgroundColor: "#27272a",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  btnSecondaryText: { color: "#fff", fontWeight: "600", fontSize: 14 },
   row: {
     backgroundColor: "#fff",
     borderRadius: 10,

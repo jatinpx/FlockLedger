@@ -23,6 +23,10 @@ from app.schemas.farm import (
 )
 from app.schemas.pagination import Paginated
 from app.services.audit_service import record_audit
+from app.services.labour_provision import (
+    deactivate_farm_labour_for_non_worker,
+    ensure_farm_labour_for_worker,
+)
 from app.services.redis_events import publish_farm_event
 
 router = APIRouter(prefix="/farms", tags=["farms"])
@@ -314,6 +318,8 @@ def add_farm_member(
     m = FarmMember(user_id=target.id, farm_id=farm_id, role=body.role)
     db.add(m)
     db.flush()
+    if body.role == "worker":
+        ensure_farm_labour_for_worker(db, farm_id, target.id)
     record_audit(
         db,
         user_id=user.id,
@@ -362,6 +368,8 @@ def add_farm_member_by_user_id(
     m = FarmMember(user_id=target.id, farm_id=farm_id, role=body.role)
     db.add(m)
     db.flush()
+    if body.role == "worker":
+        ensure_farm_labour_for_worker(db, farm_id, target.id)
     record_audit(
         db,
         user_id=user.id,
@@ -438,6 +446,10 @@ def patch_farm_member_role(
 
     target.role = body.role
     db.flush()
+    if body.role == "worker":
+        ensure_farm_labour_for_worker(db, farm_id, member_user_id)
+    elif before_role == "worker":
+        deactivate_farm_labour_for_non_worker(db, farm_id, member_user_id)
     record_audit(
         db,
         user_id=user.id,

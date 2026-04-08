@@ -124,6 +124,7 @@ export default function DashboardPage() {
           profit={profit.profit}
           cost_per_egg={profit.cost_per_egg}
           periodLabel={`${profit.period_start} → ${profit.period_end}`}
+          expenseBreakdown={profit.expense_breakdown}
         />
       )}
     </div>

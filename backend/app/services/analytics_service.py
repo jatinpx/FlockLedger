@@ -5,7 +5,8 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import EggProduction, Expense, FeedInventory, Sale, Shed
+from app.models import EggProduction, FeedInventory, Sale, Shed
+from app.services.pl_expenses import merged_expense_amounts_by_date, pl_expense_breakdown
 from app.services.reporting_period import (
     bucket_label,
     date_bucket_start,
@@ -217,21 +218,9 @@ def _sales_amounts_by_date(db: Session, farm_id: int, start: date, end: date) ->
     return acc
 
 
-def _expense_amounts_by_date(db: Session, farm_id: int, start: date, end: date) -> dict[date, Decimal]:
-    rows = (
-        db.query(Expense.date, Expense.amount)
-        .filter(Expense.farm_id == farm_id, Expense.date >= start, Expense.date <= end)
-        .all()
-    )
-    acc: dict[date, Decimal] = defaultdict(lambda: Decimal("0"))
-    for d, amt in rows:
-        acc[d] += Decimal(str(amt))
-    return acc
-
-
 def daily_profit_series(db: Session, farm_id: int, start: date, end: date) -> list[dict]:
     sales_m = _sales_amounts_by_date(db, farm_id, start, end)
-    exp_m = _expense_amounts_by_date(db, farm_id, start, end)
+    exp_m = merged_expense_amounts_by_date(db, farm_id, start, end)
     out: list[dict] = []
     cur = start
     while cur <= end:
@@ -307,15 +296,6 @@ def sales_total(db: Session, farm_id: int, start: date, end: date) -> Decimal:
     return Decimal(str(q or 0))
 
 
-def expenses_total(db: Session, farm_id: int, start: date, end: date) -> Decimal:
-    q = (
-        db.query(func.coalesce(func.sum(Expense.amount), 0))
-        .filter(Expense.farm_id == farm_id, Expense.date >= start, Expense.date <= end)
-        .scalar()
-    )
-    return Decimal(str(q or 0))
-
-
 def trays_sold_total(db: Session, farm_id: int, start: date, end: date) -> int:
     q = (
         db.query(func.coalesce(func.sum(Sale.trays_sold), 0))
@@ -327,8 +307,9 @@ def trays_sold_total(db: Session, farm_id: int, start: date, end: date) -> int:
 
 def profit_summary(db: Session, farm_id: int, start: date, end: date) -> dict:
     rev = sales_total(db, farm_id, start, end)
-    exp = expenses_total(db, farm_id, start, end)
-    profit = rev - exp
+    br = pl_expense_breakdown(db, farm_id, start, end)
+    exp = Decimal(str(br["total"]))
+    profit = float(rev - exp)
     usable, _, _ = egg_stats_for_farm(db, farm_id, start, end)
     cost_per_egg = None
     if usable > 0:
@@ -336,9 +317,10 @@ def profit_summary(db: Session, farm_id: int, start: date, end: date) -> dict:
     return {
         "revenue": float(rev),
         "expenses": float(exp),
-        "profit": float(profit),
+        "profit": profit,
         "cost_per_egg": cost_per_egg,
         "usable_eggs_in_period": usable,
+        "expense_breakdown": br,
     }
 
 

@@ -2,6 +2,10 @@
 
 MISCELLANEOUS_CATEGORY = "Miscellaneous"
 
+# Used when linking labour payments and feed entries to the expense log / P&L.
+LABOUR_WAGES_CATEGORY = "Labour & wages"
+FEED_FODDER_CATEGORY = "Feed & fodder"
+
 # Order: typical frequency / grouping; "Miscellaneous" last in UI.
 EXPENSE_CATEGORIES: tuple[str, ...] = (
     "Feed & fodder",

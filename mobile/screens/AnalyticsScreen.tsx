@@ -201,6 +201,11 @@ export function AnalyticsScreen() {
           <Text style={styles.line}>Revenue: {fmtInr(profit.revenue)}</Text>
           <Text style={styles.line}>Expenses: {fmtInr(profit.expenses)}</Text>
           <Text style={styles.profitLine}>Profit: {fmtInr(profit.profit)}</Text>
+          <Text style={styles.sub}>
+            Expense mix: log {fmtInr(profit.expense_breakdown.expense_entries)} · unlinked labour{" "}
+            {fmtInr(profit.expense_breakdown.unlinked_labour_payments)} · feed rows{" "}
+            {fmtInr(profit.expense_breakdown.feed_purchase_cost_on_entries)}
+          </Text>
           {profit.cost_per_egg != null ? (
             <Text style={styles.sub}>Cost per egg (approx.): {fmtInr(profit.cost_per_egg)}</Text>
           ) : null}

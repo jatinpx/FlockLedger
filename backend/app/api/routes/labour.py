@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,7 +9,8 @@ from app.api.farm_access import require_farm_member, require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
-from app.models import FarmLabour, FarmMember, LabourLedgerLine
+from app.constants.expense_categories import LABOUR_WAGES_CATEGORY
+from app.models import Expense, FarmLabour, FarmMember, LabourLedgerLine
 from app.schemas.labour import (
     FarmLabourCreate,
     FarmLabourOut,
@@ -16,10 +18,23 @@ from app.schemas.labour import (
     LabourBalanceRow,
     LabourLedgerCreate,
     LabourLedgerOut,
+    PayrollAccrueBody,
+    PayrollListOut,
+    PayrollPayoutBody,
+    PayrollWorkerOut,
 )
 from app.schemas.pagination import Paginated
 from app.services.audit_service import record_audit
 from app.services.labour_balance import ledger_balance
+from app.services.payroll_service import (
+    accrual_description,
+    accrual_line_date,
+    current_month_str,
+    find_payroll_accrual_line,
+    month_bounds,
+    sum_ledger_in_month,
+    validate_month_str,
+)
 from app.services.redis_events import publish_farm_event
 
 router = APIRouter(prefix="/farms/{farm_id}/labour", tags=["labour"])
@@ -57,6 +72,128 @@ def _ensure_linked_user_valid(
             status_code=400,
             detail="This user is already linked to another labour record on this farm",
         )
+
+
+def _resolve_labour_for_payroll(
+    db: Session,
+    farm_id: int,
+    labour_id: int | None,
+    user_id: int | None,
+) -> FarmLabour:
+    if labour_id is not None:
+        row = (
+            db.query(FarmLabour)
+            .filter(FarmLabour.id == labour_id, FarmLabour.farm_id == farm_id)
+            .first()
+        )
+    else:
+        row = (
+            db.query(FarmLabour)
+            .filter(FarmLabour.farm_id == farm_id, FarmLabour.linked_user_id == user_id)
+            .first()
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Labour not found")
+    return row
+
+
+def _linked_expense_id(db: Session, farm_id: int, line_id: int) -> int | None:
+    eid = (
+        db.query(Expense.id)
+        .filter(
+            Expense.farm_id == farm_id,
+            Expense.labour_ledger_line_id == line_id,
+        )
+        .scalar()
+    )
+    return int(eid) if eid is not None else None
+
+
+def _line_to_ledger_out(db: Session, farm_id: int, line: LabourLedgerLine) -> LabourLedgerOut:
+    return LabourLedgerOut(
+        id=line.id,
+        farm_id=line.farm_id,
+        labour_id=line.labour_id,
+        line_date=line.line_date,
+        line_type=line.line_type,
+        amount=float(line.amount),
+        description=line.description,
+        created_by_user_id=line.created_by_user_id,
+        created_at=line.created_at,
+        linked_expense_id=_linked_expense_id(db, farm_id, line.id),
+    )
+
+
+def _add_labour_payment_line(
+    db: Session,
+    farm_id: int,
+    labour: FarmLabour,
+    *,
+    amount: Decimal,
+    line_date: date,
+    description: str | None,
+    acting_user_id: int,
+    ip: str | None,
+    force: bool = False,
+) -> LabourLedgerLine:
+    if not labour.is_active and not force:
+        raise HTTPException(
+            status_code=400,
+            detail="Labour is inactive; reactivate or pass force=true to post adjustments.",
+        )
+    line = LabourLedgerLine(
+        farm_id=farm_id,
+        labour_id=labour.id,
+        line_date=line_date,
+        line_type="payment",
+        amount=amount,
+        description=description,
+        created_by_user_id=acting_user_id,
+    )
+    db.add(line)
+    db.flush()
+    record_audit(
+        db,
+        user_id=acting_user_id,
+        farm_id=farm_id,
+        action="create",
+        resource_type="labour_ledger_line",
+        resource_id=line.id,
+        before=None,
+        after={
+            "labour_id": labour.id,
+            "line_type": "payment",
+            "amount": str(amount),
+        },
+        ip=ip,
+    )
+    exp = Expense(
+        farm_id=farm_id,
+        category=LABOUR_WAGES_CATEGORY,
+        amount=line.amount,
+        description=description or f"Wage payment — {labour.full_name}",
+        date=line_date,
+        labour_ledger_line_id=line.id,
+    )
+    db.add(exp)
+    db.flush()
+    record_audit(
+        db,
+        user_id=acting_user_id,
+        farm_id=farm_id,
+        action="create",
+        resource_type="expense",
+        resource_id=exp.id,
+        before=None,
+        after={
+            "category": exp.category,
+            "amount": float(exp.amount),
+            "labour_ledger_line_id": line.id,
+        },
+        ip=ip,
+    )
+    publish_farm_event(farm_id, "expense_created", {"id": exp.id})
+    return line
 
 
 def _labour_to_out(db: Session, row: FarmLabour) -> FarmLabourOut:
@@ -112,17 +249,216 @@ def get_my_labour_row(farm_id: int, user: CurrentUser, db: Session = Depends(get
     return _labour_to_out(db, row)
 
 
+@router.get(
+    "/payroll",
+    response_model=PayrollListOut,
+    summary="Month-scoped payroll snapshot",
+    description=(
+        "Per labour row: monthly salary (default_rate), running balance_due, and sums of "
+        "ledger earnings/payments whose line_date falls in the selected calendar month. "
+        "Payroll accrual lines use description `Payroll accrual YYYY-MM` and are dated the "
+        "last day of that month."
+    ),
+)
+def get_payroll(
+    farm_id: int,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+    month: str | None = Query(
+        None,
+        pattern=r"^\d{4}-\d{2}$",
+        description="YYYY-MM; defaults to current calendar month (server date)",
+    ),
+):
+    m = require_farm_member(db, user.id, farm_id)
+    ym = month or current_month_str()
+    try:
+        validate_month_str(ym)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid month; use YYYY-MM")
+    start, end = month_bounds(ym)
+    q = db.query(FarmLabour).filter(FarmLabour.farm_id == farm_id)
+    if m.role == "worker":
+        q = q.filter(FarmLabour.linked_user_id == user.id)
+    rows = q.order_by(FarmLabour.is_active.desc(), FarmLabour.full_name.asc()).all()
+    workers: list[PayrollWorkerOut] = []
+    for r in rows:
+        acc = sum_ledger_in_month(db, r.id, start, end, "earning")
+        paid = sum_ledger_in_month(db, r.id, start, end, "payment")
+        pl = find_payroll_accrual_line(db, r.id, ym)
+        workers.append(
+            PayrollWorkerOut(
+                labour_id=r.id,
+                full_name=r.full_name,
+                linked_user_id=r.linked_user_id,
+                personnel_kind=r.personnel_kind,
+                is_active=r.is_active,
+                monthly_salary=float(r.default_rate) if r.default_rate is not None else None,
+                balance_due=float(ledger_balance(db, r.id)),
+                month=ym,
+                month_accrued=float(acc),
+                month_paid=float(paid),
+                month_net=float(acc - paid),
+                payroll_accrual_posted=pl is not None,
+                payroll_accrual_amount=float(pl.amount) if pl is not None else None,
+            )
+        )
+    return PayrollListOut(month=ym, workers=workers)
+
+
+@router.post("/payroll/accrue", response_model=LabourLedgerOut)
+def payroll_accrue(
+    farm_id: int,
+    body: PayrollAccrueBody,
+    user: CurrentUser,
+    ip: ClientIp,
+    db: Session = Depends(get_db),
+    force: bool = Query(
+        False,
+        description="Allow accrual posting for inactive labour (owner cleanup)",
+    ),
+):
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    try:
+        validate_month_str(body.month)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid month; use YYYY-MM")
+    labour = _resolve_labour_for_payroll(db, farm_id, body.labour_id, body.user_id)
+    if not labour.is_active and not force:
+        raise HTTPException(
+            status_code=400,
+            detail="Labour is inactive; reactivate or pass force=true to post adjustments.",
+        )
+    amt_dec: Decimal
+    if body.amount is not None:
+        amt_dec = Decimal(str(body.amount))
+    elif labour.default_rate is not None:
+        amt_dec = labour.default_rate
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="amount is required when labour has no monthly salary (default_rate) set",
+        )
+    if amt_dec <= 0:
+        raise HTTPException(status_code=400, detail="amount must be positive")
+
+    accrual_desc = accrual_description(body.month)
+    line_date = accrual_line_date(body.month)
+    existing = find_payroll_accrual_line(db, labour.id, body.month)
+    if existing:
+        before_amt = str(existing.amount)
+        existing.amount = amt_dec
+        existing.line_date = line_date
+        existing.description = accrual_desc
+        db.flush()
+        record_audit(
+            db,
+            user_id=user.id,
+            farm_id=farm_id,
+            action="update",
+            resource_type="labour_ledger_line",
+            resource_id=existing.id,
+            before={"amount": before_amt},
+            after={"amount": str(amt_dec), "payroll_accrual_month": body.month},
+            ip=ip,
+        )
+        db.commit()
+        db.refresh(existing)
+        publish_farm_event(farm_id, "labour_ledger", {"labour_id": labour.id, "id": existing.id})
+        return _line_to_ledger_out(db, farm_id, existing)
+
+    line = LabourLedgerLine(
+        farm_id=farm_id,
+        labour_id=labour.id,
+        line_date=line_date,
+        line_type="earning",
+        amount=amt_dec,
+        description=accrual_desc,
+        created_by_user_id=user.id,
+    )
+    db.add(line)
+    db.flush()
+    record_audit(
+        db,
+        user_id=user.id,
+        farm_id=farm_id,
+        action="create",
+        resource_type="labour_ledger_line",
+        resource_id=line.id,
+        before=None,
+        after={
+            "labour_id": labour.id,
+            "line_type": "earning",
+            "amount": str(amt_dec),
+            "payroll_accrual_month": body.month,
+        },
+        ip=ip,
+    )
+    db.commit()
+    db.refresh(line)
+    publish_farm_event(farm_id, "labour_ledger", {"labour_id": labour.id, "id": line.id})
+    return _line_to_ledger_out(db, farm_id, line)
+
+
+@router.post("/payroll/payout", response_model=LabourLedgerOut)
+def payroll_payout(
+    farm_id: int,
+    body: PayrollPayoutBody,
+    user: CurrentUser,
+    ip: ClientIp,
+    db: Session = Depends(get_db),
+    force: bool = Query(
+        False,
+        description="Allow payout for inactive labour (owner cleanup)",
+    ),
+):
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    try:
+        validate_month_str(body.month)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid month; use YYYY-MM")
+    start, end = month_bounds(body.month)
+    if body.line_date < start or body.line_date > end:
+        raise HTTPException(
+            status_code=400,
+            detail="line_date must fall within the selected payroll month (calendar attribution)",
+        )
+    labour = _resolve_labour_for_payroll(db, farm_id, body.labour_id, body.user_id)
+    amt = body.amount
+    line = _add_labour_payment_line(
+        db,
+        farm_id,
+        labour,
+        amount=amt,
+        line_date=body.line_date,
+        description=body.description,
+        acting_user_id=user.id,
+        ip=ip,
+        force=force,
+    )
+    db.commit()
+    db.refresh(line)
+    publish_farm_event(farm_id, "labour_ledger", {"labour_id": labour.id, "id": line.id})
+    return _line_to_ledger_out(db, farm_id, line)
+
+
 @router.get("", response_model=Paginated[FarmLabourOut])
 def list_labour(
     farm_id: int,
     user: CurrentUser,
     db: Session = Depends(get_db),
     page: LimitOffset = Depends(pagination_params),
+    active_only: bool = Query(
+        False,
+        description="If true, only workers/lines with is_active=true (e.g. expense wage picker).",
+    ),
 ):
     m = require_farm_member(db, user.id, farm_id)
     q = db.query(FarmLabour).filter(FarmLabour.farm_id == farm_id)
     if m.role == "worker":
         q = q.filter(FarmLabour.linked_user_id == user.id)
+    if active_only:
+        q = q.filter(FarmLabour.is_active == True)
     q = q.order_by(FarmLabour.is_active.desc(), FarmLabour.full_name.asc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
@@ -245,51 +581,54 @@ def add_ledger_line(
     )
     if not labour:
         raise HTTPException(status_code=404, detail="Labour not found")
-    if not labour.is_active and not force:
-        raise HTTPException(
-            status_code=400,
-            detail="Labour is inactive; reactivate or pass force=true to post adjustments.",
+    if body.line_type == "payment":
+        line = _add_labour_payment_line(
+            db,
+            farm_id,
+            labour,
+            amount=body.amount,
+            line_date=body.line_date,
+            description=body.description,
+            acting_user_id=user.id,
+            ip=ip,
+            force=force,
         )
-    line = LabourLedgerLine(
-        farm_id=farm_id,
-        labour_id=labour_id,
-        line_date=body.line_date,
-        line_type=body.line_type,
-        amount=body.amount,
-        description=body.description,
-        created_by_user_id=user.id,
-    )
-    db.add(line)
-    db.flush()
-    record_audit(
-        db,
-        user_id=user.id,
-        farm_id=farm_id,
-        action="create",
-        resource_type="labour_ledger_line",
-        resource_id=line.id,
-        before=None,
-        after={
-            "labour_id": labour_id,
-            "line_type": body.line_type,
-            "amount": str(body.amount),
-        },
-        ip=ip,
-    )
+    else:
+        if not labour.is_active and not force:
+            raise HTTPException(
+                status_code=400,
+                detail="Labour is inactive; reactivate or pass force=true to post adjustments.",
+            )
+        line = LabourLedgerLine(
+            farm_id=farm_id,
+            labour_id=labour_id,
+            line_date=body.line_date,
+            line_type=body.line_type,
+            amount=body.amount,
+            description=body.description,
+            created_by_user_id=user.id,
+        )
+        db.add(line)
+        db.flush()
+        record_audit(
+            db,
+            user_id=user.id,
+            farm_id=farm_id,
+            action="create",
+            resource_type="labour_ledger_line",
+            resource_id=line.id,
+            before=None,
+            after={
+                "labour_id": labour_id,
+                "line_type": body.line_type,
+                "amount": str(body.amount),
+            },
+            ip=ip,
+        )
     db.commit()
     db.refresh(line)
     publish_farm_event(farm_id, "labour_ledger", {"labour_id": labour_id, "id": line.id})
-    return LabourLedgerOut(
-        id=line.id,
-        farm_id=line.farm_id,
-        labour_id=line.labour_id,
-        line_date=line.line_date,
-        line_type=line.line_type,
-        amount=float(line.amount),
-        description=line.description,
-        created_by_user_id=line.created_by_user_id,
-        created_at=line.created_at,
-    )
+    return _line_to_ledger_out(db, farm_id, line)
 
 
 @router.get("/{labour_id}/ledger", response_model=Paginated[LabourLedgerOut])
@@ -326,6 +665,19 @@ def list_ledger(
     q = q.order_by(LabourLedgerLine.line_date.desc(), LabourLedgerLine.id.desc())
     total = q.count()
     rows = q.offset(page.offset).limit(page.limit).all()
+    line_ids = [r.id for r in rows]
+    exp_map: dict[int, int] = {}
+    if line_ids:
+        for lid, eid in (
+            db.query(Expense.labour_ledger_line_id, Expense.id)
+            .filter(
+                Expense.farm_id == farm_id,
+                Expense.labour_ledger_line_id.in_(line_ids),
+            )
+            .all()
+        ):
+            if lid is not None:
+                exp_map[int(lid)] = int(eid)
     items = [
         LabourLedgerOut(
             id=r.id,
@@ -337,6 +689,7 @@ def list_ledger(
             description=r.description,
             created_by_user_id=r.created_by_user_id,
             created_at=r.created_at,
+            linked_expense_id=exp_map.get(r.id),
         )
         for r in rows
     ]
@@ -365,6 +718,31 @@ def delete_ledger_line(
     )
     if not line:
         raise HTTPException(status_code=404, detail="Not found")
+    linked_exp = (
+        db.query(Expense)
+        .filter(
+            Expense.labour_ledger_line_id == line_id,
+            Expense.farm_id == farm_id,
+        )
+        .first()
+    )
+    if linked_exp:
+        record_audit(
+            db,
+            user_id=user.id,
+            farm_id=farm_id,
+            action="delete",
+            resource_type="expense",
+            resource_id=linked_exp.id,
+            before={
+                "category": linked_exp.category,
+                "amount": float(linked_exp.amount),
+                "labour_ledger_line_id": line_id,
+            },
+            after=None,
+            ip=ip,
+        )
+        db.delete(linked_exp)
     record_audit(
         db,
         user_id=user.id,

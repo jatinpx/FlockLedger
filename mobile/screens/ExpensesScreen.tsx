@@ -15,14 +15,20 @@ import { useFarm } from "../lib/farm-context";
 import {
   apiFetch,
   fetchExpenseCategories,
+  LABOUR_WAGES_CATEGORY,
   MISCELLANEOUS_EXPENSE_CATEGORY,
   type ExpenseRow,
+  type FarmLabourRow,
   type Paginated,
 } from "../lib/api";
-import { withPagination } from "../lib/pagination";
+import { pageQuery, withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
 const DEFAULT_LIMIT = 25;
+
+function expenseIsLinked(r: ExpenseRow): boolean {
+  return r.labour_ledger_line_id != null || r.feed_inventory_id != null;
+}
 
 const fmtInr = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
@@ -49,6 +55,9 @@ export function ExpensesScreen() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [activeLabour, setActiveLabour] = useState<FarmLabourRow[]>([]);
+  const [wageLabourId, setWageLabourId] = useState<number | null>(null);
+  const [labourPicker, setLabourPicker] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editCategory, setEditCategory] = useState("");
   const [editAmount, setEditAmount] = useState("");
@@ -93,6 +102,30 @@ export function ExpensesScreen() {
     setCategory((prev) => (categories.includes(prev) ? prev : categories[0]));
   }, [categories]);
 
+  useEffect(() => {
+    if (category !== LABOUR_WAGES_CATEGORY) setWageLabourId(null);
+  }, [category]);
+
+  useEffect(() => {
+    if (!farmId) {
+      setActiveLabour([]);
+      return;
+    }
+    let cancelled = false;
+    apiFetch<Paginated<FarmLabourRow>>(
+      `/farms/${farmId}/labour?${pageQuery(500, 0)}&active_only=true`
+    )
+      .then((res) => {
+        if (!cancelled) setActiveLabour(res.items.filter((r) => r.is_active));
+      })
+      .catch(() => {
+        if (!cancelled) setActiveLabour([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [farmId]);
+
   const miscNeedsDescription = category === MISCELLANEOUS_EXPENSE_CATEGORY;
   const editMiscNeedsDescription = editCategory === MISCELLANEOUS_EXPENSE_CATEGORY;
 
@@ -108,17 +141,22 @@ export function ExpensesScreen() {
     }
     setSaving(true);
     try {
+      const body: Record<string, unknown> = {
+        category,
+        amount: parseFloat(amount),
+        description: descTrim ? descTrim : null,
+        date,
+      };
+      if (category === LABOUR_WAGES_CATEGORY && wageLabourId != null) {
+        body.labour_id = wageLabourId;
+      }
       await apiFetch(`/farms/${farmId}/expenses`, {
         method: "POST",
-        body: JSON.stringify({
-          category,
-          amount: parseFloat(amount),
-          description: descTrim ? descTrim : null,
-          date,
-        }),
+        body: JSON.stringify(body),
       });
       setAmount("");
       setDescription("");
+      setWageLabourId(null);
       await refresh();
     } finally {
       setSaving(false);
@@ -126,6 +164,13 @@ export function ExpensesScreen() {
   }
 
   function startEdit(r: ExpenseRow) {
+    if (expenseIsLinked(r)) {
+      Alert.alert(
+        "Linked expense",
+        "This entry is tied to labour or feed. Change it from Labour/Feed or remove the ledger line."
+      );
+      return;
+    }
     setEditingId(r.id);
     setEditCategory(r.category);
     setEditAmount(String(r.amount));
@@ -170,6 +215,11 @@ export function ExpensesScreen() {
       ? categoryOptionsWithLegacy(categories, editCategory)
       : categories;
 
+  const wagePayLabel =
+    wageLabourId == null
+      ? "Not linked (e.g. contractor)"
+      : activeLabour.find((x) => x.id === wageLabourId)?.full_name ?? `Worker #${wageLabourId}`;
+
   return (
     <ScrollView
       style={styles.wrap}
@@ -206,11 +256,54 @@ export function ExpensesScreen() {
         </View>
       </Modal>
 
+      <Modal
+        visible={labourPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLabourPicker(false)}
+      >
+        <View style={styles.modalRoot}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Pay to (active workers)</Text>
+            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              <Pressable
+                style={styles.modalRow}
+                onPress={() => {
+                  setWageLabourId(null);
+                  setLabourPicker(false);
+                }}
+              >
+                <Text style={styles.modalRowText}>— Not linked —</Text>
+              </Pressable>
+              {activeLabour.map((L) => (
+                <Pressable
+                  key={L.id}
+                  style={styles.modalRow}
+                  onPress={() => {
+                    setWageLabourId(L.id);
+                    setLabourPicker(false);
+                  }}
+                >
+                  <Text style={styles.modalRowText}>
+                    {L.full_name}
+                    {L.personnel_kind === "owner_pay" ? " (owner pay)" : ""}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable style={styles.modalCancel} onPress={() => setLabourPicker(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {canManage ? (
         <View style={styles.card}>
           <Text style={styles.h2}>Add expense</Text>
           <Text style={styles.hint}>
-            Managers and owners can add expenses. Workers can view the list.
+            Labour payments can sync from the Labour screen; feed bills can use purchase cost on Feed.
+            Linked rows cannot be edited here.
           </Text>
           <Text style={styles.label}>Category</Text>
           <Pressable
@@ -237,6 +330,20 @@ export function ExpensesScreen() {
           />
           <Text style={styles.label}>Date</Text>
           <TextInput style={styles.input} value={date} onChangeText={setDate} />
+          {category === LABOUR_WAGES_CATEGORY ? (
+            <>
+              <Text style={styles.label}>Pay to</Text>
+              <Pressable
+                style={[styles.input, styles.selectLike]}
+                onPress={() => setLabourPicker(true)}
+              >
+                <Text style={styles.selectLikeText}>{wagePayLabel}</Text>
+              </Pressable>
+              <Text style={styles.hint}>
+                Choosing a worker records a labour payment and links this expense.
+              </Text>
+            </>
+          ) : null}
           <Pressable
             style={[styles.btn, (saving || !categories.length) && styles.btnDis]}
             onPress={submit}
@@ -290,9 +397,16 @@ export function ExpensesScreen() {
             </Text>
             <Text style={styles.rowSub}>{fmtInr(r.amount)}</Text>
             <Text style={styles.note}>{r.description ?? "—"}</Text>
+            {r.linked_labour_name ? (
+              <Text style={styles.linkTag}>Worker: {r.linked_labour_name}</Text>
+            ) : r.labour_ledger_line_id != null ? (
+              <Text style={styles.linkTag}>Linked: labour payment</Text>
+            ) : r.feed_inventory_id != null ? (
+              <Text style={styles.linkTag}>Linked: feed entry</Text>
+            ) : null}
             {canManage ? (
-              <Pressable onPress={() => startEdit(r)}>
-                <Text style={styles.link}>Edit</Text>
+              <Pressable onPress={() => startEdit(r)} disabled={expenseIsLinked(r)}>
+                <Text style={[styles.link, expenseIsLinked(r) && styles.linkDis]}>Edit</Text>
               </Pressable>
             ) : null}
           </View>
@@ -321,7 +435,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 8 },
-  hint: { fontSize: 13, color: "#71717a", marginBottom: 12 },
+  hint: { fontSize: 12, color: "#71717a", marginBottom: 12 },
+  selectLike: { justifyContent: "center" },
+  selectLikeText: { fontSize: 15, color: "#18181b" },
   label: { fontSize: 12, color: "#52525b", fontWeight: "600", marginTop: 8 },
   input: {
     borderWidth: 1,
@@ -364,9 +480,9 @@ const styles = StyleSheet.create({
   note: { fontSize: 13, color: "#52525b", marginTop: 4 },
   rowActions: { flexDirection: "row", gap: 16, marginTop: 8 },
   link: { marginTop: 8, color: "#047857", fontWeight: "600", fontSize: 13 },
+  linkDis: { color: "#a1a1aa" },
+  linkTag: { marginTop: 6, fontSize: 11, color: "#6366f1", fontWeight: "600" },
   linkMuted: { color: "#71717a", fontWeight: "600", fontSize: 13 },
-  selectLike: { justifyContent: "center" },
-  selectLikeText: { fontSize: 15, color: "#18181b" },
   reqMark: { color: "#dc2626", fontWeight: "700" },
   modalRoot: {
     flex: 1,

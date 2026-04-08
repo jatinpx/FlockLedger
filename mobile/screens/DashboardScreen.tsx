@@ -223,6 +223,11 @@ export function DashboardScreen() {
               </Text>
             </View>
           </View>
+          <Text style={styles.costEgg}>
+            P&amp;L expense mix: log {fmtInr(profit.expense_breakdown.expense_entries)} · labour
+            (not in log) {fmtInr(profit.expense_breakdown.unlinked_labour_payments)} · feed purchase
+            on entries {fmtInr(profit.expense_breakdown.feed_purchase_cost_on_entries)}
+          </Text>
           {profit.cost_per_egg != null ? (
             <Text style={styles.costEgg}>
               Cost per egg (approx.):{" "}
