@@ -7,6 +7,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { apiFetch, setToken } from "../lib/api";
@@ -18,9 +19,11 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function login() {
     setErr(null);
+    setBusy(true);
     try {
       const tok = await apiFetch<{ access_token: string }>("/auth/login", {
         auth: false,
@@ -31,6 +34,8 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
       navigation.replace("FarmOverview");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Login failed");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -40,7 +45,7 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Text style={styles.title}>FlockLedger</Text>
-      <Text style={styles.sub}>Worker sign in</Text>
+      <Text style={styles.sub}>Sign in</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -48,6 +53,7 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
+        editable={!busy}
       />
       <TextInput
         style={styles.input}
@@ -55,10 +61,19 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+        editable={!busy}
       />
       {err ? <Text style={styles.err}>{err}</Text> : null}
-      <Pressable style={styles.btn} onPress={login}>
-        <Text style={styles.btnText}>Sign in</Text>
+      <Pressable
+        style={[styles.btn, busy && styles.btnDisabled]}
+        onPress={login}
+        disabled={busy}
+      >
+        {busy ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.btnText}>Sign in</Text>
+        )}
       </Pressable>
     </KeyboardAvoidingView>
   );
@@ -77,6 +92,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   err: { color: "#b91c1c", marginBottom: 8 },
-  btn: { backgroundColor: "#047857", padding: 14, borderRadius: 8, alignItems: "center" },
+  btn: {
+    backgroundColor: "#047857",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  btnDisabled: { opacity: 0.85 },
   btnText: { color: "#fff", fontWeight: "600" },
 });

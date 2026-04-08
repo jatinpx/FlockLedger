@@ -6,10 +6,12 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
-import { apiFetch, setToken, type Farm } from "../lib/api";
+import { apiFetch, setToken, type Farm, type Paginated } from "../lib/api";
+import { pageQuery } from "../lib/pagination";
 import type { RootStackParamList } from "../types";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "FarmOverview">;
@@ -21,8 +23,8 @@ export function FarmOverviewScreen({ navigation }: { navigation: Nav }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await apiFetch<Farm[]>("/farms");
-      setFarms(list);
+      const res = await apiFetch<Paginated<Farm>>(`/farms?${pageQuery(500, 0)}`);
+      setFarms(res.items);
     } catch {
       setFarms([]);
     } finally {
@@ -49,11 +51,17 @@ export function FarmOverviewScreen({ navigation }: { navigation: Nav }) {
           <Text style={styles.link}>Log out</Text>
         </Pressable>
       </View>
+      {loading && farms.length === 0 ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#047857" />
+          <Text style={styles.loadingText}>Loading farms…</Text>
+        </View>
+      ) : null}
       <FlatList
         data={farms}
         keyExtractor={(item) => String(item.id)}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={load} />
+          <RefreshControl refreshing={loading && farms.length > 0} onRefresh={load} />
         }
         ListEmptyComponent={
           !loading ? (
@@ -67,10 +75,14 @@ export function FarmOverviewScreen({ navigation }: { navigation: Nav }) {
               navigation.navigate("Dashboard", {
                 farmId: item.id,
                 farmName: item.name,
+                myRole: item.my_role,
               })
             }
           >
-            <Text style={styles.cardTitle}>{item.name}</Text>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>{item.name}</Text>
+              <Text style={styles.roleBadge}>{item.my_role}</Text>
+            </View>
             {item.location ? (
               <Text style={styles.cardSub}>{item.location}</Text>
             ) : null}
@@ -103,7 +115,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e4e4e7",
   },
-  cardTitle: { fontSize: 16, fontWeight: "600", color: "#18181b" },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  cardTitle: { fontSize: 16, fontWeight: "600", color: "#18181b", flex: 1 },
+  roleBadge: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#047857",
+    textTransform: "uppercase",
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
   cardSub: { marginTop: 4, color: "#71717a" },
   empty: { padding: 24, textAlign: "center", color: "#71717a" },
+  centered: { paddingTop: 48, alignItems: "center" },
+  loadingText: { marginTop: 12, color: "#71717a", fontSize: 14 },
 });

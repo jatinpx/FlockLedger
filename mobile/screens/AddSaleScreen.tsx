@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { apiFetch } from "../lib/api";
@@ -19,9 +20,11 @@ export function AddSaleScreen({ navigation, route }: Props) {
   const [rate, setRate] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [msg, setMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function save() {
     setMsg(null);
+    setSaving(true);
     const t = parseInt(trays, 10);
     const r = parseFloat(rate);
     const total = t * r;
@@ -39,6 +42,8 @@ export function AddSaleScreen({ navigation, route }: Props) {
       navigation.goBack();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -63,8 +68,8 @@ export function AddSaleScreen({ navigation, route }: Props) {
       <Text style={styles.label}>Date</Text>
       <TextInput style={styles.input} value={date} onChangeText={setDate} />
       {msg ? <Text style={styles.err}>{msg}</Text> : null}
-      <Pressable style={styles.btn} onPress={save}>
-        <Text style={styles.btnText}>Save</Text>
+      <Pressable style={[styles.btn, saving && styles.btnDisabled]} onPress={save} disabled={saving}>
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save</Text>}
       </Pressable>
     </ScrollView>
   );
@@ -88,6 +93,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
+    minHeight: 48,
+    justifyContent: "center",
   },
+  btnDisabled: { opacity: 0.7 },
   btnText: { color: "#fff", fontWeight: "600" },
 });

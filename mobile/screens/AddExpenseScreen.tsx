@@ -12,14 +12,14 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { apiFetch } from "../lib/api";
 import type { RootStackParamList } from "../types";
 
-type Props = NativeStackScreenProps<RootStackParamList, "AddFeed">;
+type Props = NativeStackScreenProps<RootStackParamList, "AddExpense">;
 
-export function AddFeedScreen({ navigation, route }: Props) {
+export function AddExpenseScreen({ navigation, route }: Props) {
   const { farmId } = route.params;
+  const [category, setCategory] = useState("");
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [received, setReceived] = useState("");
-  const [used, setUsed] = useState("");
-  const [remaining, setRemaining] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -27,13 +27,13 @@ export function AddFeedScreen({ navigation, route }: Props) {
     setMsg(null);
     setSaving(true);
     try {
-      await apiFetch(`/farms/${farmId}/feed`, {
+      await apiFetch(`/farms/${farmId}/expenses`, {
         method: "POST",
         body: JSON.stringify({
+          category: category.trim(),
+          amount: parseFloat(amount),
+          description: description.trim() || null,
           date,
-          feed_received: parseFloat(received),
-          feed_used: parseFloat(used),
-          feed_remaining: parseFloat(remaining),
         }),
       });
       navigation.goBack();
@@ -46,29 +46,19 @@ export function AddFeedScreen({ navigation, route }: Props) {
 
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={{ padding: 16 }}>
+      <Text style={styles.label}>Category</Text>
+      <TextInput style={styles.input} value={category} onChangeText={setCategory} />
+      <Text style={styles.label}>Amount (₹)</Text>
+      <TextInput
+        style={styles.input}
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="decimal-pad"
+      />
+      <Text style={styles.label}>Description (optional)</Text>
+      <TextInput style={styles.input} value={description} onChangeText={setDescription} />
       <Text style={styles.label}>Date</Text>
       <TextInput style={styles.input} value={date} onChangeText={setDate} />
-      <Text style={styles.label}>Received (kg)</Text>
-      <TextInput
-        style={styles.input}
-        value={received}
-        onChangeText={setReceived}
-        keyboardType="decimal-pad"
-      />
-      <Text style={styles.label}>Used (kg)</Text>
-      <TextInput
-        style={styles.input}
-        value={used}
-        onChangeText={setUsed}
-        keyboardType="decimal-pad"
-      />
-      <Text style={styles.label}>Remaining (kg)</Text>
-      <TextInput
-        style={styles.input}
-        value={remaining}
-        onChangeText={setRemaining}
-        keyboardType="decimal-pad"
-      />
       {msg ? <Text style={styles.err}>{msg}</Text> : null}
       <Pressable style={[styles.btn, saving && styles.btnDisabled]} onPress={save} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save</Text>}

@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { pageQuery } from "./pagination";
 
 const BASE = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000").replace(
   /\/$/,
@@ -36,5 +37,142 @@ export async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
-export type Farm = { id: number; name: string; location: string | null };
-export type Shed = { id: number; farm_id: number; name: string; bird_count: number };
+export type Paginated<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+/** Walk pages until all rows are loaded (for dropdowns; cap by API max limit per request). */
+export async function fetchAllPaginated<T>(pathWithoutPagination: string): Promise<T[]> {
+  const all: T[] = [];
+  let offset = 0;
+  const limit = 500;
+  while (true) {
+    const q = pageQuery(limit, offset);
+    const url = pathWithoutPagination.includes("?")
+      ? `${pathWithoutPagination}&${q}`
+      : `${pathWithoutPagination}?${q}`;
+    const r = await apiFetch<Paginated<T>>(url);
+    all.push(...r.items);
+    if (r.items.length === 0 || all.length >= r.total) break;
+    offset += limit;
+  }
+  return all;
+}
+
+export type Farm = {
+  id: number;
+  name: string;
+  location: string | null;
+  owner_id: number;
+  created_at: string;
+  my_role: string;
+};
+
+export type FarmDetail = {
+  id: number;
+  name: string;
+  location: string | null;
+  owner_id: number;
+  created_at: string;
+};
+
+export type Shed = {
+  id: number;
+  farm_id: number;
+  name: string;
+  bird_count: number;
+  created_at: string;
+};
+
+export type FarmMemberRow = {
+  user_id: number;
+  name: string;
+  email: string;
+  role: string;
+};
+
+export type UserSearchRow = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type EggProduction = {
+  id: number;
+  shed_id: number;
+  date: string;
+  eggs_produced: number;
+  broken_eggs: number;
+  usable_eggs: number;
+  trays: number;
+  eggs_per_tray: number;
+  created_at: string;
+};
+
+export type FeedRow = {
+  id: number;
+  farm_id: number;
+  date: string;
+  feed_received: number;
+  feed_used: number;
+  feed_remaining: number;
+  created_at: string;
+};
+
+export type SaleRow = {
+  id: number;
+  farm_id: number;
+  buyer_name: string;
+  trays_sold: number;
+  rate_per_tray: number;
+  total_amount: number;
+  date: string;
+  created_at: string;
+};
+
+export type ExpenseRow = {
+  id: number;
+  farm_id: number;
+  category: string;
+  amount: number;
+  description: string | null;
+  date: string;
+  created_at: string;
+};
+
+export type DashboardSummary = {
+  farm_id: number;
+  total_birds: number;
+  tray_stock: {
+    trays_produced_equivalent: number;
+    trays_sold: number;
+    trays_in_stock: number;
+    usable_eggs_equivalent: number;
+  };
+  last_7_days_eggs: number;
+  last_7_days_trays: number;
+};
+
+export type ProfitSummary = {
+  revenue: number;
+  expenses: number;
+  profit: number;
+  cost_per_egg: number | null;
+};
+
+export type AuditLogRow = {
+  id: number;
+  farm_id: number | null;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  action: string;
+  resource_type: string;
+  resource_id: number | null;
+  detail: Record<string, unknown> | null;
+  ip_address: string | null;
+  created_at: string;
+};

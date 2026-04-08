@@ -6,9 +6,10 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { apiFetch, type Shed } from "../lib/api";
+import { apiFetch, fetchAllPaginated, type Shed } from "../lib/api";
 import type { RootStackParamList } from "../types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AddEgg">;
@@ -16,23 +17,38 @@ type Props = NativeStackScreenProps<RootStackParamList, "AddEgg">;
 export function AddEggScreen({ navigation, route }: Props) {
   const { farmId } = route.params;
   const [sheds, setSheds] = useState<Shed[]>([]);
+  const [shedsLoading, setShedsLoading] = useState(true);
   const [shedId, setShedId] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [eggs, setEggs] = useState("");
   const [broken, setBroken] = useState("0");
   const [msg, setMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    apiFetch<Shed[]>(`/farms/${farmId}/sheds`)
+    let cancelled = false;
+    setShedsLoading(true);
+    fetchAllPaginated<Shed>(`/farms/${farmId}/sheds`)
       .then((s) => {
-        setSheds(s);
-        if (s.length) setShedId(String(s[0].id));
+        if (!cancelled) {
+          setSheds(s);
+          if (s.length) setShedId(String(s[0].id));
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setSheds([]);
+      })
+      .finally(() => {
+        if (!cancelled) setShedsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [farmId]);
 
   async function save() {
     setMsg(null);
+    setSaving(true);
     try {
       await apiFetch(`/farms/${farmId}/production/eggs`, {
         method: "POST",
@@ -47,17 +63,26 @@ export function AddEggScreen({ navigation, route }: Props) {
       navigation.goBack();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.label}>Shed ID (from list)</Text>
+      {shedsLoading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator color="#047857" />
+          <Text style={styles.loadingHint}>Loading sheds…</Text>
+        </View>
+      ) : null}
+      <Text style={styles.label}>Shed</Text>
       <TextInput
         style={styles.input}
         value={shedId}
         onChangeText={setShedId}
         keyboardType="number-pad"
+        editable={!shedsLoading}
       />
       <Text style={styles.hint}>
         Sheds: {sheds.map((s) => `${s.name} (#${s.id})`).join(", ") || "none"}
@@ -79,8 +104,16 @@ export function AddEggScreen({ navigation, route }: Props) {
         keyboardType="number-pad"
       />
       {msg ? <Text style={styles.msg}>{msg}</Text> : null}
-      <Pressable style={styles.btn} onPress={save}>
-        <Text style={styles.btnText}>Save</Text>
+      <Pressable
+        style={[styles.btn, (saving || shedsLoading) && styles.btnDisabled]}
+        onPress={save}
+        disabled={saving || shedsLoading}
+      >
+        {saving ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.btnText}>Save</Text>
+        )}
       </Pressable>
     </ScrollView>
   );
@@ -88,6 +121,8 @@ export function AddEggScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: "#fafafa" },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 },
+  loadingHint: { color: "#71717a", fontSize: 14 },
   label: { marginTop: 12, fontSize: 13, color: "#52525b", fontWeight: "600" },
   input: {
     borderWidth: 1,
@@ -105,6 +140,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
+    minHeight: 48,
+    justifyContent: "center",
   },
+  btnDisabled: { opacity: 0.6 },
   btnText: { color: "#fff", fontWeight: "600" },
 });
