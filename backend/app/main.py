@@ -18,6 +18,8 @@ from app.api.routes import (
     expenses,
     farms,
     feed,
+    flock,
+    labour,
     ml,
     production,
     sales,
@@ -49,6 +51,8 @@ app.include_router(farms.router)
 app.include_router(audit.router)
 app.include_router(production.router)
 app.include_router(feed.router)
+app.include_router(labour.router)
+app.include_router(flock.router)
 app.include_router(sales.router)
 app.include_router(expenses.router)
 app.include_router(analytics.router)

@@ -35,7 +35,11 @@ class FeedInventoryCreate(BaseModel):
     date: Date
     feed_received: float = Field(..., ge=0)
     feed_used: float = Field(..., ge=0)
-    feed_remaining: float = Field(..., ge=0)
+    feed_remaining: float | None = Field(
+        None,
+        ge=0,
+        description="If omitted, remaining = opening + received - used (opening from last entry).",
+    )
 
 
 class FeedInventoryOut(BaseModel):
@@ -45,6 +49,14 @@ class FeedInventoryOut(BaseModel):
     feed_received: float
     feed_used: float
     feed_remaining: float
+    opening_balance_kg: float = Field(
+        ...,
+        description="Stock kg at start of this row (before received/used).",
+    )
+    remaining_auto: bool = Field(
+        default=True,
+        description="False if client supplied feed_remaining override.",
+    )
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -54,7 +66,11 @@ class FeedInventoryUpdate(BaseModel):
     date: Date | None = None
     feed_received: float | None = Field(None, ge=0)
     feed_used: float | None = Field(None, ge=0)
-    feed_remaining: float | None = Field(None, ge=0)
+    feed_remaining: float | None = Field(
+        None,
+        ge=0,
+        description="Set to override auto; omit with received/used change to recompute.",
+    )
 
 
 class EggProductionPatch(BaseModel):

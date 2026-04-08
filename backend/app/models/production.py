@@ -2,7 +2,7 @@ import datetime as dt
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -35,6 +35,7 @@ class FeedInventory(Base):
     feed_received: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     feed_used: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     feed_remaining: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    remaining_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     date: Mapped[dt.date] = mapped_column(Date, nullable=False, index=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
