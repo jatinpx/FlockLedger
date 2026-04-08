@@ -7,19 +7,18 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFarm } from "../lib/farm-context";
 import { apiFetch, type AuditLogRow, type Paginated } from "../lib/api";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
-import type { RootStackParamList } from "../types";
-
-type Props = NativeStackScreenProps<RootStackParamList, "Audit">;
 
 const DEFAULT_LIMIT = 25;
 
-export function AuditScreen({ route }: Props) {
-  const { farmId } = route.params;
+export function AuditScreen() {
+  const { farmId, farms } = useFarm();
+  const current = farms.find((f) => f.id === farmId);
+  const canView = current?.my_role === "owner" || current?.my_role === "manager";
+
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
@@ -27,6 +26,7 @@ export function AuditScreen({ route }: Props) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    if (!farmId || !canView) return;
     setLoading(true);
     try {
       const r = await apiFetch<Paginated<AuditLogRow>>(
@@ -40,20 +40,36 @@ export function AuditScreen({ route }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [farmId, limit, offset]);
+  }, [farmId, canView, limit, offset]);
 
   useEffect(() => {
     setOffset(0);
   }, [limit, farmId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (!farmId) {
+    return <Text style={styles.muted}>Select a farm first.</Text>;
+  }
+
+  if (!canView) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.title}>Audit log</Text>
+        <Text style={styles.muted}>
+          Only farm owners and managers can view the activity log for this farm.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrap}>
+      <Text style={styles.intro}>
+        Recent creates, updates, and deletes (newest first). Owners and managers only.
+      </Text>
       {loading && rows.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#047857" />
@@ -64,12 +80,10 @@ export function AuditScreen({ route }: Props) {
         keyExtractor={(item) => String(item.id)}
         refreshControl={<RefreshControl refreshing={loading && rows.length > 0} onRefresh={load} />}
         ListEmptyComponent={
-          !loading ? (
-            <Text style={styles.empty}>No audit entries (or no access).</Text>
-          ) : null
+          !loading ? <Text style={styles.muted}>No audit entries on this page.</Text> : null
         }
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <View style={styles.row}>
             <Text style={styles.when}>{new Date(item.created_at).toLocaleString()}</Text>
             <Text style={styles.who}>
               {item.user_name} · {item.action} · {item.resource_type}
@@ -93,17 +107,26 @@ export function AuditScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa" },
+  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
+  intro: { fontSize: 13, color: "#52525b", marginBottom: 12 },
   center: { padding: 24, alignItems: "center" },
-  empty: { textAlign: "center", color: "#71717a", padding: 24 },
+  muted: { color: "#71717a", padding: 8 },
   card: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 12,
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e4e4e7",
+    padding: 16,
+    margin: 16,
+  },
+  title: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 8 },
+  row: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e4e4e7",
+    padding: 12,
+    marginBottom: 8,
   },
   when: { fontSize: 11, color: "#71717a", marginBottom: 4 },
   who: { fontSize: 13, color: "#18181b", fontWeight: "600" },

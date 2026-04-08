@@ -11,7 +11,7 @@ import {
   Modal,
   Alert,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type { DrawerScreenProps } from "@react-navigation/drawer";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   apiFetch,
@@ -21,11 +21,12 @@ import {
   type Shed,
   type UserSearchRow,
 } from "../lib/api";
+import { useFarm } from "../lib/farm-context";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
-import type { RootStackParamList } from "../types";
+import type { DrawerParamList } from "../navigation/MainDrawer";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
+type Props = DrawerScreenProps<DrawerParamList, "Settings">;
 
 const DEFAULT_SHEED = 10;
 const DEFAULT_MEM = 10;
@@ -36,9 +37,13 @@ function roleOptionsForMember(m: FarmMemberRow, isOwner: boolean): string[] {
   return ["worker", "manager"];
 }
 
-export function SettingsScreen({ navigation, route }: Props) {
-  const { farmId, farmName, myRole } = route.params;
+export function SettingsScreen({ navigation }: Props) {
+  const { farmId, farms, setFarmId, refreshFarms, invalidateMemberLists } = useFarm();
+  const currentFarm = farms.find((f) => f.id === farmId);
+  const farmName = currentFarm?.name ?? "Farm";
+  const myRole = currentFarm?.my_role ?? "worker";
   const isOwner = myRole === "owner";
+  const canManage = myRole === "owner" || myRole === "manager";
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -86,6 +91,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   } | null>(null);
 
   const loadFarm = useCallback(async () => {
+    if (!farmId) return;
     const f = await apiFetch<FarmDetail>(`/farms/${farmId}`);
     setFarmDetail(f);
     setEditName(f.name);
@@ -93,6 +99,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   }, [farmId]);
 
   const loadSheds = useCallback(async () => {
+    if (!farmId) return;
     const r = await apiFetch<Paginated<Shed>>(
       withPagination(`/farms/${farmId}/sheds`, shedLimit, shedOffset)
     );
@@ -101,12 +108,13 @@ export function SettingsScreen({ navigation, route }: Props) {
   }, [farmId, shedLimit, shedOffset]);
 
   const loadMembers = useCallback(async () => {
+    if (!farmId || !canManage) return;
     const r = await apiFetch<Paginated<FarmMemberRow>>(
       withPagination(`/farms/${farmId}/members`, memLimit, memOffset)
     );
     setMembers(r.items);
     setMemTotal(r.total);
-  }, [farmId, memLimit, memOffset]);
+  }, [farmId, memLimit, memOffset, canManage]);
 
   const reloadAll = useCallback(async () => {
     setRefreshing(true);
@@ -146,6 +154,11 @@ export function SettingsScreen({ navigation, route }: Props) {
   }, [userQuery, farmId, searchLimit]);
 
   useEffect(() => {
+    if (!farmId || !canManage) {
+      setSearchHits([]);
+      setSearchTotal(0);
+      return;
+    }
     const q = userQuery.trim();
     const t = setTimeout(() => {
       setSearchBusy(true);
@@ -163,7 +176,7 @@ export function SettingsScreen({ navigation, route }: Props) {
         .finally(() => setSearchBusy(false));
     }, 350);
     return () => clearTimeout(t);
-  }, [userQuery, farmId, searchLimit, searchOffset]);
+  }, [userQuery, farmId, searchLimit, searchOffset, canManage]);
 
   useEffect(() => {
     if (!isOwner && inviteRole === "owner") setInviteRole("worker");
@@ -181,8 +194,10 @@ export function SettingsScreen({ navigation, route }: Props) {
       });
       setNewFarmName("");
       setNewFarmLoc("");
-      Alert.alert("Created", `Farm “${f.name}” created. Open it from the farm list.`);
-      navigation.navigate("FarmOverview");
+      await refreshFarms();
+      setFarmId(f.id);
+      Alert.alert("Created", `Farm “${f.name}” created.`);
+      navigation.navigate("Dashboard");
     } catch (e) {
       Alert.alert("Error", e instanceof Error ? e.message : "Create failed");
     } finally {
@@ -191,6 +206,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   }
 
   async function saveFarm() {
+    if (!farmId) return;
     setSaveFarmBusy(true);
     try {
       await apiFetch(`/farms/${farmId}`, {
@@ -201,6 +217,7 @@ export function SettingsScreen({ navigation, route }: Props) {
         }),
       });
       await loadFarm();
+      await refreshFarms();
       Alert.alert("Saved", "Farm details updated.");
     } catch (e) {
       Alert.alert("Error", e instanceof Error ? e.message : "Update failed");
@@ -210,6 +227,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   }
 
   async function addShed() {
+    if (!farmId) return;
     setAddShedBusy(true);
     try {
       await apiFetch(`/farms/${farmId}/sheds`, {
@@ -231,7 +249,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   }
 
   async function saveShed() {
-    if (!editingShed) return;
+    if (!farmId || !editingShed) return;
     setSaveShedBusy(true);
     try {
       await apiFetch(`/farms/${farmId}/sheds/${editingShed.id}`, {
@@ -252,6 +270,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   }
 
   async function inviteByEmail() {
+    if (!farmId) return;
     setInviteBusy(true);
     try {
       await apiFetch(`/farms/${farmId}/members`, {
@@ -260,6 +279,7 @@ export function SettingsScreen({ navigation, route }: Props) {
       });
       setMemberEmail("");
       await loadMembers();
+      invalidateMemberLists();
       Alert.alert("Sent", "Invitation sent.");
     } catch (e) {
       Alert.alert("Error", e instanceof Error ? e.message : "Failed");
@@ -269,6 +289,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   }
 
   async function addByUserId(uid: number) {
+    if (!farmId) return;
     try {
       await apiFetch(`/farms/${farmId}/members/by-user-id`, {
         method: "POST",
@@ -276,6 +297,7 @@ export function SettingsScreen({ navigation, route }: Props) {
       });
       setUserQuery("");
       await loadMembers();
+      invalidateMemberLists();
       Alert.alert("Added", "Member added.");
     } catch (e) {
       Alert.alert("Error", e instanceof Error ? e.message : "Failed");
@@ -283,6 +305,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   }
 
   async function applyRole(userId: number, newRole: string) {
+    if (!farmId) return;
     setRoleSavingId(userId);
     setRoleModal(null);
     try {
@@ -291,6 +314,7 @@ export function SettingsScreen({ navigation, route }: Props) {
         body: JSON.stringify({ role: newRole }),
       });
       await loadMembers();
+      invalidateMemberLists();
     } catch (e) {
       Alert.alert("Error", e instanceof Error ? e.message : "Role update failed");
     } finally {
@@ -303,9 +327,11 @@ export function SettingsScreen({ navigation, route }: Props) {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reloadAll} />}
     >
-      <Text style={styles.h1}>Settings · {farmName}</Text>
+      <Text style={styles.h1}>
+        Settings{farmId ? ` · ${farmName}` : ""}
+      </Text>
 
-      <Text style={styles.section}>Create another farm</Text>
+      <Text style={styles.section}>Create farm</Text>
       <TextInput
         style={styles.input}
         placeholder="New farm name"
@@ -326,21 +352,36 @@ export function SettingsScreen({ navigation, route }: Props) {
         {createBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Create farm</Text>}
       </Pressable>
 
-      <Text style={styles.section}>This farm</Text>
-      <TextInput style={styles.input} value={editName} onChangeText={setEditName} />
-      <TextInput style={styles.input} value={editLoc} onChangeText={setEditLoc} placeholder="Location" />
-      <Pressable
-        style={[styles.btn, saveFarmBusy && styles.btnDisabled]}
-        onPress={saveFarm}
-        disabled={saveFarmBusy}
-      >
-        {saveFarmBusy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.btnText}>Save farm details</Text>
-        )}
-      </Pressable>
+      {!farmId ? (
+        <Text style={styles.hint}>Choose a farm from the header menu to edit it.</Text>
+      ) : null}
 
+      {farmId && canManage ? (
+        <>
+          <Text style={styles.section}>This farm</Text>
+          <TextInput style={styles.input} value={editName} onChangeText={setEditName} />
+          <TextInput
+            style={styles.input}
+            value={editLoc}
+            onChangeText={setEditLoc}
+            placeholder="Location"
+          />
+          <Pressable
+            style={[styles.btn, saveFarmBusy && styles.btnDisabled]}
+            onPress={saveFarm}
+            disabled={saveFarmBusy}
+          >
+            {saveFarmBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.btnText}>Save farm details</Text>
+            )}
+          </Pressable>
+        </>
+      ) : null}
+
+      {farmId ? (
+        <>
       <Text style={styles.section}>Sheds</Text>
       <TextInput style={styles.input} placeholder="Shed name" value={shedName} onChangeText={setShedName} />
       <TextInput
@@ -381,7 +422,11 @@ export function SettingsScreen({ navigation, route }: Props) {
         onLimitChange={setShedLimit}
         onOffsetChange={setShedOffset}
       />
+        </>
+      ) : null}
 
+      {farmId && canManage ? (
+        <>
       <Text style={styles.section}>Members</Text>
       <Text style={styles.sub}>Invite role</Text>
       <View style={styles.roleRow}>
@@ -470,6 +515,8 @@ export function SettingsScreen({ navigation, route }: Props) {
         onLimitChange={setMemLimit}
         onOffsetChange={setMemOffset}
       />
+        </>
+      ) : null}
 
       <Modal visible={!!editingShed} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
@@ -520,6 +567,7 @@ export function SettingsScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16, paddingBottom: 40 },
   h1: { fontSize: 18, fontWeight: "700", color: "#18181b", marginBottom: 16 },
+  hint: { fontSize: 14, color: "#71717a", marginBottom: 12 },
   section: {
     fontSize: 13,
     fontWeight: "700",

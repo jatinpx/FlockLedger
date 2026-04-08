@@ -6,6 +6,10 @@ const BASE = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000").replac
   ""
 );
 
+export function getApiBase(): string {
+  return BASE;
+}
+
 const TOKEN_KEY = "flock_token";
 
 export async function getToken(): Promise<string | null> {
@@ -119,6 +123,9 @@ export type FeedRow = {
   feed_received: number;
   feed_used: number;
   feed_remaining: number;
+  /** Present when API supports auto-remaining (migration 003+). */
+  opening_balance_kg?: number;
+  remaining_auto?: boolean;
   created_at: string;
 };
 
@@ -154,6 +161,56 @@ export type DashboardSummary = {
   };
   last_7_days_eggs: number;
   last_7_days_trays: number;
+  labour_due_total?: number;
+  flock_mortality_total?: number;
+  flock_birds_added_total?: number;
+  flock_birds_removed_total?: number;
+};
+
+export type FarmLabourRow = {
+  id: number;
+  farm_id: number;
+  full_name: string;
+  phone: string | null;
+  personnel_kind: string;
+  compensation_type: string;
+  default_rate: number | null;
+  notes: string | null;
+  is_active: boolean;
+  hired_at: string;
+  balance_due: number;
+  created_at: string;
+};
+
+export type LabourLedgerRow = {
+  id: number;
+  farm_id: number;
+  labour_id: number;
+  line_date: string;
+  line_type: string;
+  amount: number;
+  description: string | null;
+  created_by_user_id: number;
+  created_at: string;
+};
+
+export type FlockSummary = {
+  birds_alive_total: number;
+  by_kind: Record<string, number>;
+  by_shed: { shed_id: number; name: string; bird_count: number }[];
+};
+
+export type FlockEventRow = {
+  id: number;
+  farm_id: number;
+  shed_id: number;
+  event_date: string;
+  event_kind: string;
+  quantity: number;
+  birds_delta: number;
+  note: string | null;
+  created_by_user_id: number;
+  created_at: string;
 };
 
 export type ProfitSummary = {

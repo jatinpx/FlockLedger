@@ -31,7 +31,7 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
         body: JSON.stringify({ email, password }),
       });
       await setToken(tok.access_token);
-      navigation.replace("FarmOverview");
+      navigation.replace("Main");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Login failed");
     } finally {
