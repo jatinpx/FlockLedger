@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Pressable,
+  TextInput,
 } from "react-native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type Paginated, type ProfitSummaryOut } from "../lib/api";
@@ -16,10 +17,19 @@ import {
   buildSummaryQuery,
   GRANULARITY_OPTIONS,
   type Granularity,
+  type SummaryPeriodInput,
 } from "../lib/reporting-query";
 
 const CHART_PAGE = 500;
 const PERIOD_DAYS = [7, 14, 30, 90, 180, 365] as const;
+const PERIOD_MODES = ["days", "range", "start_only", "end_only"] as const;
+
+function periodModeLabel(mode: (typeof PERIOD_MODES)[number]): string {
+  if (mode === "days") return "Days";
+  if (mode === "range") return "Range";
+  if (mode === "start_only") return "From";
+  return "Until";
+}
 
 const fmtInr = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
@@ -27,7 +37,10 @@ const fmtInr = (n: number) =>
 /** Same data as web analytics; charts replaced with scrollable lists + JSON for ML. */
 export function AnalyticsScreen() {
   const { farmId } = useFarm();
+  const [periodMode, setPeriodMode] = useState<(typeof PERIOD_MODES)[number]>("days");
   const [periodDays, setPeriodDays] = useState<number>(30);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [granularity, setGranularity] = useState<Granularity>("day");
   const [profit, setProfit] = useState<ProfitSummaryOut | null>(null);
   const [eggs, setEggs] = useState<
@@ -53,12 +66,31 @@ export function AnalyticsScreen() {
 
   useEffect(() => {
     if (!farmId) return;
+    if (periodMode === "range" && (!startDate || !endDate)) {
+      setLoading(false);
+      return;
+    }
+    if (periodMode === "start_only" && !startDate) {
+      setLoading(false);
+      return;
+    }
+    if (periodMode === "end_only" && !endDate) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setFailed(false);
     setLoading(true);
     (async () => {
       try {
-        const period = { kind: "days" as const, days: periodDays };
+        const period: SummaryPeriodInput =
+          periodMode === "days"
+            ? { kind: "days", days: periodDays }
+            : periodMode === "range"
+              ? { kind: "range", start_date: startDate, end_date: endDate }
+              : periodMode === "start_only"
+                ? { kind: "start_only", start_date: startDate }
+                : { kind: "end_only", end_date: endDate };
         const sumQs = buildSummaryQuery(period);
         const seriesQs = buildSeriesQuery(period, granularity);
         const [e, f, p, d, me, mf] = await Promise.all([
@@ -133,7 +165,7 @@ export function AnalyticsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, tick, periodDays, granularity]);
+  }, [farmId, tick, periodMode, periodDays, startDate, endDate, granularity]);
 
   if (!farmId) {
     return <Text style={styles.muted}>Select or create a farm in Settings.</Text>;
@@ -164,20 +196,65 @@ export function AnalyticsScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.hint}>Period (days)</Text>
+      <Text style={styles.hint}>Period mode</Text>
       <View style={styles.chipRow}>
-        {PERIOD_DAYS.map((d) => (
+        {PERIOD_MODES.map((mode) => (
           <Pressable
-            key={d}
-            style={[styles.chip, periodDays === d && styles.chipOn]}
-            onPress={() => setPeriodDays(d)}
+            key={mode}
+            style={[styles.chipSm, periodMode === mode && styles.chipOn]}
+            onPress={() => setPeriodMode(mode)}
           >
-            <Text style={[styles.chipText, periodDays === d && styles.chipTextOn]}>
-              {d === 365 ? "1y" : d === 180 ? "6m" : d === 90 ? "90d" : `${d}d`}
+            <Text style={[styles.chipTextSm, periodMode === mode && styles.chipTextOn]}>
+              {periodModeLabel(mode)}
             </Text>
           </Pressable>
         ))}
       </View>
+
+      {periodMode === "days" ? (
+        <>
+          <Text style={styles.hint}>Period (days)</Text>
+          <View style={styles.chipRow}>
+            {PERIOD_DAYS.map((d) => (
+              <Pressable
+                key={d}
+                style={[styles.chip, periodDays === d && styles.chipOn]}
+                onPress={() => setPeriodDays(d)}
+              >
+                <Text style={[styles.chipText, periodDays === d && styles.chipTextOn]}>
+                  {d === 365 ? "1y" : d === 180 ? "6m" : d === 90 ? "90d" : `${d}d`}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {periodMode === "range" || periodMode === "start_only" ? (
+        <>
+          <Text style={styles.hint}>Start date (YYYY-MM-DD)</Text>
+          <TextInput
+            style={styles.input}
+            value={startDate}
+            onChangeText={setStartDate}
+            autoCapitalize="none"
+            placeholder="2026-01-01"
+          />
+        </>
+      ) : null}
+
+      {periodMode === "range" || periodMode === "end_only" ? (
+        <>
+          <Text style={styles.hint}>End date (YYYY-MM-DD)</Text>
+          <TextInput
+            style={styles.input}
+            value={endDate}
+            onChangeText={setEndDate}
+            autoCapitalize="none"
+            placeholder="2026-12-31"
+          />
+        </>
+      ) : null}
       <Text style={styles.hint}>Bucket</Text>
       <View style={styles.chipRow}>
         {GRANULARITY_OPTIONS.map((g) => (
@@ -285,6 +362,15 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontWeight: "600", color: "#3f3f46" },
   chipTextSm: { fontSize: 11, fontWeight: "600", color: "#3f3f46" },
   chipTextOn: { color: "#065f46" },
+  input: {
+    borderWidth: 1,
+    borderColor: "#e4e4e7",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginTop: 16, marginBottom: 10 },
   line: { fontSize: 15, color: "#3f3f46", marginTop: 6 },
   profitLine: { fontSize: 16, fontWeight: "700", color: "#047857", marginTop: 8 },

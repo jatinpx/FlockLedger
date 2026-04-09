@@ -115,6 +115,11 @@ export function ProductionScreen() {
     }
   }
 
+  const totalEggsOnPage = rows.reduce((sum, row) => sum + row.eggs_produced, 0);
+  const totalBrokenOnPage = rows.reduce((sum, row) => sum + row.broken_eggs, 0);
+  const totalUsableOnPage = rows.reduce((sum, row) => sum + row.usable_eggs, 0);
+  const canSubmit = !!shedId && Number.isFinite(parseInt(eggs, 10));
+
   if (!farmId) {
     return (
       <Text style={styles.muted}>Select or create a farm in Settings.</Text>
@@ -125,11 +130,38 @@ export function ProductionScreen() {
     <ScrollView
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
+      contentContainerStyle={styles.content}
     >
-      <View style={styles.card}>
-        <Text style={styles.h2}>Add egg production</Text>
+      <View style={styles.headerCard}>
+        <Text style={styles.screenTitle}>Production</Text>
+        <Text style={styles.screenSub}>Track daily eggs by shed and edit records quickly</Text>
+      </View>
+
+      <View style={styles.kpiGrid}>
+        <View style={styles.kpiCard}>
+          <Text style={styles.kpiLabel}>Records on page</Text>
+          <Text style={styles.kpiValue}>{rows.length}</Text>
+        </View>
+        <View style={styles.kpiCard}>
+          <Text style={styles.kpiLabel}>Produced</Text>
+          <Text style={styles.kpiValue}>{totalEggsOnPage.toLocaleString()}</Text>
+        </View>
+        <View style={styles.kpiCard}>
+          <Text style={styles.kpiLabel}>Usable</Text>
+          <Text style={styles.kpiValueAccent}>{totalUsableOnPage.toLocaleString()}</Text>
+        </View>
+        <View style={styles.kpiCard}>
+          <Text style={styles.kpiLabel}>Broken</Text>
+          <Text style={styles.kpiValueWarn}>{totalBrokenOnPage.toLocaleString()}</Text>
+        </View>
+      </View>
+
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>Add Egg Production</Text>
+        <Text style={styles.sectionSub}>Select shed, date, and quantities</Text>
+
         <Text style={styles.label}>Shed</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
           {sheds.map((s) => (
             <Pressable
               key={s.id}
@@ -142,35 +174,59 @@ export function ProductionScreen() {
             </Pressable>
           ))}
         </ScrollView>
+        {sheds.length === 0 ? <Text style={styles.helpWarn}>Add a shed in Settings first.</Text> : null}
+
         <Text style={styles.label}>Date</Text>
-        <TextInput style={styles.input} value={date} onChangeText={setDate} />
-        <Text style={styles.label}>Eggs produced</Text>
-        <TextInput style={styles.input} value={eggs} onChangeText={setEggs} keyboardType="number-pad" />
-        <Text style={styles.label}>Broken eggs</Text>
-        <TextInput style={styles.input} value={broken} onChangeText={setBroken} keyboardType="number-pad" />
-        <Pressable style={[styles.btn, saving && styles.btnDis]} onPress={submit} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save</Text>}
+        <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
+
+        <View style={styles.inputGrid}>
+          <View style={styles.inputCol}>
+            <Text style={styles.label}>Eggs produced</Text>
+            <TextInput style={styles.input} value={eggs} onChangeText={setEggs} keyboardType="number-pad" />
+          </View>
+          <View style={styles.inputCol}>
+            <Text style={styles.label}>Broken eggs</Text>
+            <TextInput style={styles.input} value={broken} onChangeText={setBroken} keyboardType="number-pad" />
+          </View>
+        </View>
+
+        <Pressable
+          style={[styles.primaryBtn, (saving || !canSubmit || sheds.length === 0) && styles.btnDis]}
+          onPress={submit}
+          disabled={saving || !canSubmit || sheds.length === 0}
+        >
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Save production</Text>}
         </Pressable>
       </View>
 
-      <Text style={styles.h2}>Recent records</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Recent Records</Text>
+        <Text style={styles.sectionSub}>Tap Edit to modify any record</Text>
+      </View>
+
       {loading && !rows.length ? (
         <ActivityIndicator style={{ marginVertical: 16 }} color="#047857" />
       ) : null}
+
       {rows.map((r) =>
         editingId === r.id ? (
-          <View key={r.id} style={[styles.row, styles.rowEdit]}>
-            <TextInput style={styles.inputSm} value={editDate} onChangeText={setEditDate} />
-            <ScrollView horizontal style={styles.chips}>
+          <View key={r.id} style={styles.editCard}>
+            <Text style={styles.editTitle}>Editing #{r.id}</Text>
+
+            <Text style={styles.label}>Date</Text>
+            <TextInput style={styles.input} value={editDate} onChangeText={setEditDate} />
+
+            <Text style={styles.label}>Shed</Text>
+            <ScrollView horizontal style={styles.chipsRow} showsHorizontalScrollIndicator={false}>
               {sheds.map((s) => (
                 <Pressable
                   key={s.id}
-                  style={[styles.chipSm, editShedId === String(s.id) && styles.chipOn]}
+                  style={[styles.chip, editShedId === String(s.id) && styles.chipOn]}
                   onPress={() => setEditShedId(String(s.id))}
                 >
                   <Text
                     style={[
-                      styles.chipTextSm,
+                      styles.chipText,
                       editShedId === String(s.id) && styles.chipTextOn,
                     ]}
                   >
@@ -179,31 +235,60 @@ export function ProductionScreen() {
                 </Pressable>
               ))}
             </ScrollView>
-            <TextInput style={styles.inputSm} value={editEggs} onChangeText={setEditEggs} keyboardType="number-pad" />
-            <TextInput style={styles.inputSm} value={editBroken} onChangeText={setEditBroken} keyboardType="number-pad" />
-            <View style={styles.rowActions}>
-              <Pressable onPress={saveEdit} disabled={saving}>
-                <Text style={styles.link}>Save</Text>
+
+            <View style={styles.inputGrid}>
+              <View style={styles.inputCol}>
+                <Text style={styles.label}>Eggs produced</Text>
+                <TextInput style={styles.input} value={editEggs} onChangeText={setEditEggs} keyboardType="number-pad" />
+              </View>
+              <View style={styles.inputCol}>
+                <Text style={styles.label}>Broken eggs</Text>
+                <TextInput style={styles.input} value={editBroken} onChangeText={setEditBroken} keyboardType="number-pad" />
+              </View>
+            </View>
+
+            <View style={styles.actionRow}>
+              <Pressable style={[styles.primaryBtnSmall, saving && styles.btnDis]} onPress={saveEdit} disabled={saving}>
+                <Text style={styles.primaryBtnText}>Save</Text>
               </Pressable>
-              <Pressable onPress={() => setEditingId(null)}>
-                <Text style={styles.linkMuted}>Cancel</Text>
+              <Pressable style={styles.ghostBtn} onPress={() => setEditingId(null)}>
+                <Text style={styles.ghostBtnText}>Cancel</Text>
               </Pressable>
             </View>
           </View>
         ) : (
-          <View key={r.id} style={styles.row}>
-            <Text style={styles.rowMain}>
-              {r.date} · {sheds.find((s) => s.id === r.shed_id)?.name ?? r.shed_id}
-            </Text>
-            <Text style={styles.rowSub}>
-              {r.eggs_produced} prod · {r.broken_eggs} broken · {r.usable_eggs} usable · {r.trays} trays
-            </Text>
-            <Pressable onPress={() => startEdit(r)}>
-              <Text style={styles.link}>Edit</Text>
+          <View key={r.id} style={styles.recordCard}>
+            <View style={styles.recordTopRow}>
+              <Text style={styles.recordTitle}>{sheds.find((s) => s.id === r.shed_id)?.name ?? `Shed ${r.shed_id}`}</Text>
+              <Text style={styles.recordDate}>{r.date}</Text>
+            </View>
+
+            <View style={styles.statRow}>
+              <View style={styles.statChip}>
+                <Text style={styles.statChipLabel}>Produced</Text>
+                <Text style={styles.statChipValue}>{r.eggs_produced}</Text>
+              </View>
+              <View style={styles.statChip}>
+                <Text style={styles.statChipLabel}>Broken</Text>
+                <Text style={[styles.statChipValue, styles.warnText]}>{r.broken_eggs}</Text>
+              </View>
+              <View style={styles.statChip}>
+                <Text style={styles.statChipLabel}>Usable</Text>
+                <Text style={[styles.statChipValue, styles.accentText]}>{r.usable_eggs}</Text>
+              </View>
+              <View style={styles.statChip}>
+                <Text style={styles.statChipLabel}>Trays</Text>
+                <Text style={styles.statChipValue}>{r.trays}</Text>
+              </View>
+            </View>
+
+            <Pressable style={styles.inlineAction} onPress={() => startEdit(r)}>
+              <Text style={styles.inlineActionText}>Edit record</Text>
             </Pressable>
           </View>
         )
       )}
+
       <PaginatedControls
         total={total}
         limit={limit}
@@ -216,57 +301,75 @@ export function ProductionScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
-  muted: { padding: 16, color: "#71717a" },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+  wrap: { flex: 1, backgroundColor: "#f3f4f6" },
+  content: { padding: 16, paddingBottom: 28 },
+  muted: { padding: 16, color: "#6b7280", fontSize: 14 },
+
+  headerCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#e5e7eb",
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 12,
   },
-  h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 12 },
-  label: { fontSize: 12, color: "#52525b", fontWeight: "600", marginTop: 8 },
+  screenTitle: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
+  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
+
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
+  kpiCard: {
+    width: "48%",
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+  },
+  kpiLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", fontWeight: "700" },
+  kpiValue: { fontSize: 24, fontWeight: "800", color: "#0f172a", marginTop: 6 },
+  kpiValueAccent: { fontSize: 24, fontWeight: "800", color: "#047857", marginTop: 6 },
+  kpiValueWarn: { fontSize: 24, fontWeight: "800", color: "#b45309", marginTop: 6 },
+
+  sectionCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
+  },
+  sectionHeader: { marginBottom: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
+  sectionSub: { fontSize: 12, color: "#6b7280", marginTop: 3 },
+
+  label: { fontSize: 12, color: "#4b5563", fontWeight: "600", marginBottom: 4 },
   input: {
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 4,
-    backgroundColor: "#fff",
-  },
-  inputSm: {
-    borderWidth: 1,
-    borderColor: "#e4e4e7",
-    borderRadius: 6,
-    padding: 8,
-    marginBottom: 8,
-    fontSize: 13,
-  },
-  chips: { marginTop: 6, marginBottom: 4 },
-  chip: {
+    borderColor: "#d1d5db",
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e4e4e7",
-    marginRight: 8,
-    backgroundColor: "#fff",
+    paddingVertical: 10,
+    backgroundColor: "#ffffff",
+    color: "#111827",
   },
-  chipSm: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
+  inputGrid: { flexDirection: "row", gap: 10, marginTop: 6 },
+  inputCol: { flex: 1, gap: 4 },
+
+  chipsRow: { marginBottom: 10 },
+  chip: {
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    marginRight: 6,
+    borderColor: "#d1d5db",
+    marginRight: 8,
+    backgroundColor: "#ffffff",
   },
   chipOn: { backgroundColor: "#047857", borderColor: "#047857" },
-  chipText: { fontSize: 13, fontWeight: "600", color: "#3f3f46" },
-  chipTextSm: { fontSize: 12, color: "#3f3f46" },
+  chipText: { fontSize: 12, fontWeight: "700", color: "#374151" },
   chipTextOn: { color: "#fff" },
-  btn: {
+
+  primaryBtn: {
     marginTop: 16,
     backgroundColor: "#047857",
     padding: 14,
@@ -275,20 +378,73 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: "center",
   },
+  primaryBtnSmall: {
+    flex: 1,
+    backgroundColor: "#047857",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
   btnDis: { opacity: 0.7 },
-  btnText: { color: "#fff", fontWeight: "600" },
-  row: {
-    backgroundColor: "#fff",
+  primaryBtnText: { color: "#fff", fontWeight: "700" },
+  ghostBtn: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  ghostBtnText: { color: "#374151", fontWeight: "600" },
+
+  recordCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 12,
+    marginBottom: 10,
+  },
+  recordTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  recordTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
+
+  statRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  statChip: {
+    minWidth: "47%",
+    flex: 1,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 12,
-    marginBottom: 8,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  rowEdit: { backgroundColor: "#fafafa" },
-  rowMain: { fontWeight: "700", color: "#18181b" },
-  rowSub: { fontSize: 13, color: "#52525b", marginTop: 4 },
-  rowActions: { flexDirection: "row", gap: 16, marginTop: 8 },
-  link: { marginTop: 8, color: "#047857", fontWeight: "600", fontSize: 13 },
-  linkMuted: { color: "#71717a", fontWeight: "600", fontSize: 13 },
+  statChipLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", fontWeight: "700" },
+  statChipValue: { marginTop: 4, fontSize: 16, fontWeight: "700", color: "#111827" },
+
+  inlineAction: { marginTop: 10 },
+  inlineActionText: { color: "#047857", fontWeight: "700", fontSize: 13 },
+
+  editCard: {
+    backgroundColor: "#fffbeb",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    padding: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  editTitle: { fontSize: 14, fontWeight: "700", color: "#92400e" },
+  actionRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+
+  helpWarn: { marginTop: -2, marginBottom: 6, fontSize: 12, color: "#b45309" },
+  accentText: { color: "#047857" },
+  warnText: { color: "#b45309" },
 });

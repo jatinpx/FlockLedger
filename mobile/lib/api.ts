@@ -32,10 +32,28 @@ export async function apiFetch<T>(
     const t = await getToken();
     if (t) h.set("Authorization", `Bearer ${t}`);
   }
-  const res = await fetch(`${BASE}${path}`, { ...rest, headers: h });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { ...rest, headers: h });
+  } catch (error) {
+    console.error("[apiFetch] network error", {
+      method: (rest.method ?? "GET").toUpperCase(),
+      url: `${BASE}${path}`,
+      error,
+    });
+    throw error;
+  }
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    const msg = text || res.statusText || `HTTP ${res.status}`;
+    console.error("[apiFetch] request failed", {
+      method: (rest.method ?? "GET").toUpperCase(),
+      url: `${BASE}${path}`,
+      status: res.status,
+      statusText: res.statusText,
+      body: text,
+    });
+    throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

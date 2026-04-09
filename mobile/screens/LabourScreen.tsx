@@ -9,10 +9,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   Switch,
+  Alert,
 } from "react-native";
 import { useFarm } from "../lib/farm-context";
 import {
   apiFetch,
+  type FarmMemberRow,
   type FarmLabourRow,
   type LabourLedgerRow,
   type Paginated,
@@ -40,6 +42,22 @@ function lastDayOfMonthLocal(ym: string): string {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+function workerMembersFreeForCreate(rows: FarmLabourRow[], members: FarmMemberRow[]) {
+  const taken = new Set(
+    rows.map((r) => r.linked_user_id).filter((id): id is number => id != null)
+  );
+  return members.filter((m) => !taken.has(m.user_id));
+}
+
+function membersAvailableForRow(row: FarmLabourRow, rows: FarmLabourRow[], members: FarmMemberRow[]) {
+  const taken = new Set(
+    rows
+      .filter((x) => x.id !== row.id && x.linked_user_id != null)
+      .map((x) => x.linked_user_id as number)
+  );
+  return members.filter((m) => !taken.has(m.user_id) || m.user_id === row.linked_user_id);
 }
 
 export function LabourScreen() {
@@ -70,6 +88,8 @@ export function LabourScreen() {
   const [defaultRate, setDefaultRate] = useState("");
   const [notes, setNotes] = useState("");
   const [hiredAt, setHiredAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [linkUserId, setLinkUserId] = useState("");
+  const [workerMembers, setWorkerMembers] = useState<FarmMemberRow[]>([]);
 
   const [lineType, setLineType] = useState<"earning" | "payment" | "adjustment">("earning");
   const [lineAmount, setLineAmount] = useState("");
@@ -147,6 +167,16 @@ export function LabourScreen() {
       setSelectedId(rows[0].id);
     }
   }, [canManage, isWorker, rows, selectedId]);
+
+  useEffect(() => {
+    if (!farmId || !canManage) {
+      setWorkerMembers([]);
+      return;
+    }
+    apiFetch<Paginated<FarmMemberRow>>(withPagination(`/farms/${farmId}/members`, 500, 0))
+      .then((res) => setWorkerMembers(res.items.filter((m) => m.role === "worker")))
+      .catch(() => setWorkerMembers([]));
+  }, [farmId, canManage]);
 
   useEffect(() => {
     setLedgerOffset(0);
@@ -252,13 +282,33 @@ export function LabourScreen() {
           default_rate: defaultRate.trim() ? parseFloat(defaultRate) : null,
           notes: notes.trim() || null,
           hired_at: hiredAt,
+          linked_user_id: linkUserId.trim() ? parseInt(linkUserId, 10) : null,
         }),
       });
       setFullName("");
       setPhone("");
       setNotes("");
       setDefaultRate("");
+      setLinkUserId("");
       await refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function patchLabourLink(labourId: number, raw: string) {
+    if (!farmId || !canManage) return;
+    const linked_user_id = raw === "" ? null : Number(raw);
+    if (linked_user_id !== null && Number.isNaN(linked_user_id)) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/farms/${farmId}/labour/${labourId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ linked_user_id }),
+      });
+      await refresh();
+      await loadPayroll();
+      if (selectedId === labourId) await refreshLedger();
     } finally {
       setSaving(false);
     }
@@ -317,6 +367,17 @@ export function LabourScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function confirmDeleteLedgerLine(lineId: number) {
+    Alert.alert("Remove ledger line?", "This cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => void deleteLedgerLine(lineId),
+      },
+    ]);
   }
 
   if (!farmId) {
@@ -404,6 +465,25 @@ export function LabourScreen() {
           />
           <Text style={styles.label}>Notes</Text>
           <TextInput style={styles.input} value={notes} onChangeText={setNotes} />
+          <Text style={styles.label}>Link worker app login (optional)</Text>
+          <View style={styles.rowChips}>
+            <Pressable
+              style={[styles.chip, linkUserId === "" && styles.chipOn]}
+              onPress={() => setLinkUserId("")}
+            >
+              <Text style={styles.chipText}>Not linked</Text>
+            </Pressable>
+            {workerMembersFreeForCreate(rows, workerMembers).map((m) => (
+              <Pressable
+                key={m.user_id}
+                style={[styles.chip, linkUserId === String(m.user_id) && styles.chipOn]}
+                onPress={() => setLinkUserId(String(m.user_id))}
+              >
+                <Text style={styles.chipText}>{m.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.mutedSm}>Lets that worker see only their own row and ledger.</Text>
           <Pressable
             style={[styles.btn, saving && styles.btnDis]}
             onPress={createPerson}
@@ -426,6 +506,7 @@ export function LabourScreen() {
           <Text style={styles.rowSub}>
             {r.personnel_kind === "owner_pay" ? "Owner pay" : "Labour"} · {r.compensation_type} ·{" "}
             {fmtInr(r.balance_due)} · {r.is_active ? "Active" : "Inactive"}
+            {r.linked_user_id != null ? ` · linked #${r.linked_user_id}` : ""}
           </Text>
           {canManage ? (
             <Pressable onPress={() => void toggleActive(r)} style={{ marginTop: 8 }}>
@@ -445,6 +526,30 @@ export function LabourScreen() {
       {selectedId != null && selected ? (
         <View style={styles.card}>
           <Text style={styles.h2}>Payroll — {selected.full_name}</Text>
+          {canManage ? (
+            <>
+              <Text style={styles.label}>Linked app worker</Text>
+              <View style={styles.rowChips}>
+                <Pressable
+                  style={[styles.chip, selected.linked_user_id == null && styles.chipOn]}
+                  onPress={() => void patchLabourLink(selected.id, "")}
+                  disabled={saving}
+                >
+                  <Text style={styles.chipText}>Not linked</Text>
+                </Pressable>
+                {membersAvailableForRow(selected, rows, workerMembers).map((m) => (
+                  <Pressable
+                    key={m.user_id}
+                    style={[styles.chip, selected.linked_user_id === m.user_id && styles.chipOn]}
+                    onPress={() => void patchLabourLink(selected.id, String(m.user_id))}
+                    disabled={saving}
+                  >
+                    <Text style={styles.chipText}>{m.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
           {selectedPayroll ? (
             <>
               <Text style={styles.rowSub}>
@@ -584,7 +689,7 @@ export function LabourScreen() {
               </Text>
               {L.description ? <Text style={styles.rowSub}>{L.description}</Text> : null}
               {canManage ? (
-                <Pressable onPress={() => void deleteLedgerLine(L.id)}>
+                <Pressable onPress={() => confirmDeleteLedgerLine(L.id)}>
                   <Text style={styles.dangerLink}>Remove</Text>
                 </Pressable>
               ) : null}

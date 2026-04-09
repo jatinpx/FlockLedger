@@ -24,10 +24,12 @@ export function AuditScreen() {
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     if (!farmId || !canView) return;
     setLoading(true);
+    setFailed(false);
     try {
       const r = await apiFetch<Paginated<AuditLogRow>>(
         withPagination(`/farms/${farmId}/audit-logs`, limit, offset)
@@ -37,6 +39,7 @@ export function AuditScreen() {
     } catch {
       setRows([]);
       setTotal(0);
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -70,6 +73,14 @@ export function AuditScreen() {
       <Text style={styles.intro}>
         Recent creates, updates, and deletes (newest first). Owners and managers only.
       </Text>
+      {failed && rows.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.muted}>Audit log could not be loaded.</Text>
+          <Text style={styles.retryLink} onPress={() => void load()}>
+            Try again
+          </Text>
+        </View>
+      ) : null}
       {loading && rows.length === 0 ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#047857" />
@@ -89,7 +100,11 @@ export function AuditScreen() {
               {item.user_name} · {item.action} · {item.resource_type}
               {item.resource_id != null ? ` #${item.resource_id}` : ""}
             </Text>
+            <Text style={styles.email}>{item.user_email}</Text>
             <Text style={styles.ip}>{item.ip_address ?? "—"}</Text>
+            {item.detail ? (
+              <Text style={styles.detail}>{JSON.stringify(item.detail)}</Text>
+            ) : null}
           </View>
         )}
         ListFooterComponent={
@@ -130,5 +145,16 @@ const styles = StyleSheet.create({
   },
   when: { fontSize: 11, color: "#71717a", marginBottom: 4 },
   who: { fontSize: 13, color: "#18181b", fontWeight: "600" },
+  email: { fontSize: 12, color: "#52525b", marginTop: 4 },
   ip: { fontSize: 12, color: "#a1a1aa", marginTop: 4 },
+  detail: {
+    marginTop: 6,
+    fontSize: 11,
+    color: "#52525b",
+    fontFamily: "monospace",
+    backgroundColor: "#fafafa",
+    borderRadius: 6,
+    padding: 8,
+  },
+  retryLink: { color: "#047857", fontWeight: "600", marginTop: 8 },
 });

@@ -240,6 +240,18 @@ export function FlockScreen() {
         </View>
       ) : null}
 
+      {summary?.by_shed?.length ? (
+        <View style={styles.card}>
+          <Text style={styles.h2}>By shed</Text>
+          {summary.by_shed.map((row) => (
+            <View key={row.shed_id} style={styles.shedRow}>
+              <Text style={styles.shedName}>{row.name}</Text>
+              <Text style={styles.shedCount}>{row.bird_count.toLocaleString()}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {canPost ? (
         <View style={styles.card}>
           <Text style={styles.h2}>Log event</Text>
@@ -382,6 +394,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statChipText: { fontSize: 13, color: "#3f3f46" },
+  shedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#f4f4f5",
+    paddingVertical: 10,
+  },
+  shedName: { fontSize: 14, color: "#18181b", fontWeight: "600" },
+  shedCount: { fontSize: 14, color: "#047857", fontWeight: "700" },
   warn: { color: "#b45309", fontSize: 13, marginTop: 8 },
   btn: {
     marginTop: 16,
