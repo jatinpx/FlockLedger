@@ -45,6 +45,14 @@ function lastDayOfMonthLocal(ym: string): string {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isFutureDate(value: string): boolean {
+  return value > todayStr();
+}
+
 function workerMembersFreeForCreate(rows: FarmLabourRow[], members: FarmMemberRow[]) {
   const taken = new Set(
     rows.map((r) => r.linked_user_id).filter((id): id is number => id != null)
@@ -249,6 +257,10 @@ export function LabourScreen() {
     if (!farmId || selectedId == null || !canManage) return;
     const amt = parseFloat(payoutAmountInput);
     if (Number.isNaN(amt) || amt <= 0) return;
+    if (isFutureDate(payoutDateInput)) {
+      Alert.alert("Invalid date", "Payment date cannot be in the future.");
+      return;
+    }
     const sel = rows.find((x) => x.id === selectedId);
     const q = sel && !sel.is_active ? "?force=true" : "";
     setSaving(true);
@@ -273,6 +285,10 @@ export function LabourScreen() {
 
   async function createPerson() {
     if (!farmId || !canManage) return;
+    if (isFutureDate(hiredAt)) {
+      Alert.alert("Invalid date", "Hired date cannot be in the future.");
+      return;
+    }
     setSaving(true);
     try {
       await apiFetch(`/farms/${farmId}/labour`, {
@@ -332,10 +348,48 @@ export function LabourScreen() {
     }
   }
 
+  async function deleteLabour(r: FarmLabourRow) {
+    if (!farmId || !canManage) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/farms/${farmId}/labour/${r.id}`, {
+        method: "DELETE",
+      });
+      if (selectedId === r.id) {
+        setSelectedId(null);
+        setLedgerRows([]);
+        setLedgerTotal(0);
+      }
+      await refresh();
+      await loadPayroll();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function confirmDeleteLabour(r: FarmLabourRow) {
+    Alert.alert(
+      "Delete person?",
+      `This removes ${r.full_name} and all associated ledger lines.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => void deleteLabour(r),
+        },
+      ]
+    );
+  }
+
   async function addLedgerLine() {
     if (!farmId || selectedId == null || !canManage) return;
     const amt = parseFloat(lineAmount);
     if (Number.isNaN(amt)) return;
+    if (isFutureDate(lineDate)) {
+      Alert.alert("Invalid date", "Ledger date cannot be in the future.");
+      return;
+    }
     const sel = rows.find((x) => x.id === selectedId);
     const q = sel && !sel.is_active && forceInactive ? "?force=true" : "";
     setSaving(true);
@@ -518,9 +572,14 @@ export function LabourScreen() {
               </Text>
             </View>
             {canManage ? (
-              <Pressable onPress={() => void toggleActive(r)} style={styles.inlinePill}>
-                <Text style={styles.link}>{r.is_active ? "Deactivate" : "Reactivate"}</Text>
-              </Pressable>
+              <View style={styles.rowChips}>
+                <Pressable onPress={() => void toggleActive(r)} style={styles.inlinePill}>
+                  <Text style={styles.link}>{r.is_active ? "Deactivate" : "Reactivate"}</Text>
+                </Pressable>
+                <Pressable onPress={() => confirmDeleteLabour(r)} style={styles.inlinePill}>
+                  <Text style={styles.dangerLink}>Delete</Text>
+                </Pressable>
+              </View>
             ) : null}
           </View>
           <View style={styles.recordStatsCompact}>

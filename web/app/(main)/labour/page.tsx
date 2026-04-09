@@ -43,6 +43,10 @@ function workerMembersFreeForCreate(rows: FarmLabourRow[], members: FarmMemberRo
   return members.filter((m) => !taken.has(m.user_id));
 }
 
+function maxDateStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function LabourPage() {
   const { farms, farmId } = useFarm();
   const runLoaded = useAsyncLoader();
@@ -323,6 +327,28 @@ export default function LabourPage() {
     }
   }
 
+  async function deleteLabour(r: FarmLabourRow) {
+    if (!farmId || !canManage) return;
+    if (!window.confirm(`Delete ${r.full_name}? This will remove all their ledger lines.`)) {
+      return;
+    }
+    try {
+      await runLoaded(async () => {
+        await apiFetch(`/farms/${farmId}/labour/${r.id}`, { method: "DELETE" });
+      });
+      toastSuccess("Person deleted.");
+      if (selectedId === r.id) {
+        setSelectedId(null);
+        setLedgerRows([]);
+        setLedgerTotal(0);
+      }
+      await refresh();
+      await refreshPayroll();
+    } catch (err) {
+      toastError(err);
+    }
+  }
+
   async function addLedgerLine(e: React.FormEvent) {
     e.preventDefault();
     if (!farmId || selectedId == null || !canManage) return;
@@ -487,6 +513,7 @@ export default function LabourPage() {
                 className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                 value={hiredAt}
                 onChange={(e) => setHiredAt(e.target.value)}
+                max={maxDateStr()}
                 required
               />
             </div>
@@ -636,13 +663,22 @@ export default function LabourPage() {
                   ) : null}
                   {canManage ? (
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
-                        onClick={() => void toggleActive(r)}
-                      >
-                        {r.is_active ? "Deactivate" : "Reactivate"}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
+                          onClick={() => void toggleActive(r)}
+                        >
+                          {r.is_active ? "Deactivate" : "Reactivate"}
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-rose-700 dark:text-rose-400 hover:underline"
+                          onClick={() => void deleteLabour(r)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -766,6 +802,7 @@ export default function LabourPage() {
                     className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                     value={payoutDateInput}
                     onChange={(e) => setPayoutDateInput(e.target.value)}
+                    max={maxDateStr()}
                     required
                   />
                 </div>
@@ -837,6 +874,7 @@ export default function LabourPage() {
                   className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   value={lineDate}
                   onChange={(e) => setLineDate(e.target.value)}
+                  max={maxDateStr()}
                   required
                 />
               </div>
