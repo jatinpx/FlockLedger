@@ -21,7 +21,7 @@ import {
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 50;
 
 const EVENT_KINDS = [
   { value: "mortality", label: "Mortality" },
@@ -202,6 +202,11 @@ export function FlockScreen() {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={pullRefresh} />}
     >
+      <View style={styles.headerCard}>
+        <Text style={styles.screenTitle}>Flock</Text>
+        <Text style={styles.screenSub}>Bird counts, movement and event tracking</Text>
+      </View>
+
       {summary ? (
         <View style={styles.grid}>
           <View style={styles.tile}>
@@ -312,21 +317,26 @@ export function FlockScreen() {
 
       <Text style={styles.h2}>Recent events</Text>
       {events.map((ev) => (
-        <View key={ev.id} style={styles.row}>
-          <Text style={styles.rowMain}>
-            {ev.event_date} · {kindLabel(ev.event_kind)}
-          </Text>
-          <Text style={styles.rowSub}>
-            {shedNameById.get(ev.shed_id) ?? `#${ev.shed_id}`} · qty {ev.quantity} · Δ{" "}
-            {ev.birds_delta > 0 ? "+" : ""}
-            {ev.birds_delta}
-          </Text>
-          {ev.note ? <Text style={styles.rowSub}>{ev.note}</Text> : null}
-          {canManage ? (
-            <Pressable onPress={() => confirmDelete(ev.id)}>
-              <Text style={styles.danger}>Delete</Text>
-            </Pressable>
-          ) : null}
+        <View key={ev.id} style={styles.rowCompact}>
+          <View style={styles.rowTop}>
+            <View style={styles.recordHeadLeft}>
+              <Text style={styles.recordTitle} numberOfLines={1}>{kindLabel(ev.event_kind)}</Text>
+              <Text style={styles.recordDate}>{ev.event_date}</Text>
+            </View>
+            {canManage ? (
+              <Pressable style={styles.deletePill} onPress={() => confirmDelete(ev.id)}>
+                <Text style={styles.danger}>Delete</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={styles.recordStatsCompact}>
+            <Text style={styles.statInline}>{shedNameById.get(ev.shed_id) ?? `#${ev.shed_id}`}</Text>
+            <Text style={styles.statInline}>Q {ev.quantity}</Text>
+            <Text style={[styles.statInline, ev.birds_delta > 0 ? styles.accentText : styles.warnText]}>
+              Δ {ev.birds_delta > 0 ? "+" : ""}{ev.birds_delta}
+            </Text>
+            {ev.note ? <Text style={styles.statInline} numberOfLines={1}>Note {ev.note}</Text> : null}
+          </View>
         </View>
       ))}
       <PaginatedControls
@@ -341,7 +351,17 @@ export function FlockScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
+  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16 },
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
+  },
+  screenTitle: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
+  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
   muted: { fontSize: 14, color: "#71717a", marginBottom: 12 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
   tile: {
@@ -359,9 +379,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 16,
-    marginBottom: 20,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
   },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 8 },
   hint: { fontSize: 12, color: "#71717a", marginBottom: 12 },
@@ -420,11 +440,45 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#e5e7eb",
     padding: 12,
     marginBottom: 8,
   },
-  rowMain: { fontWeight: "700", color: "#18181b" },
-  rowSub: { fontSize: 13, color: "#52525b", marginTop: 4 },
-  danger: { marginTop: 8, color: "#b91c1c", fontWeight: "600", fontSize: 13 },
+  rowCompact: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  rowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 8,
+  },
+  recordHeadLeft: { flex: 1, paddingRight: 8 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordStatsCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  deletePill: {
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#fff",
+  },
+  danger: { color: "#b91c1c", fontWeight: "700", fontSize: 13 },
+  accentText: { color: "#047857" },
+  warnText: { color: "#b45309" },
 });

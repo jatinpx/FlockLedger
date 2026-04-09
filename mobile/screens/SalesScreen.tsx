@@ -14,7 +14,7 @@ import { apiFetch, type Paginated, type SaleRow } from "../lib/api";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 50;
 const EGGS_PER_TRAY = 30;
 
 type RateBasis = "tray" | "egg";
@@ -164,6 +164,11 @@ export function SalesScreen() {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
     >
+      <View style={styles.headerCard}>
+        <Text style={styles.screenTitle}>Sales</Text>
+        <Text style={styles.screenSub}>Track tray sales and pricing quickly</Text>
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.h2}>Record sale</Text>
         <Text style={styles.hint}>1 tray = {EGGS_PER_TRAY} eggs. Choose ₹/tray or ₹/egg.</Text>
@@ -235,17 +240,22 @@ export function SalesScreen() {
             </View>
           </View>
         ) : (
-          <View key={r.id} style={styles.row}>
-            <Text style={styles.rowMain}>
-              {r.buyer_name} · {r.date}
-            </Text>
-            <Text style={styles.rowSub}>
-              {r.trays_sold} trays @ {fmtInr(r.rate_per_tray)}/tray ({fmtInr(roundMoney2(eggFromRow(r)))}/egg) →{" "}
-              {fmtInr(r.total_amount)}
-            </Text>
-            <Pressable onPress={() => startEdit(r)}>
-              <Text style={styles.link}>Edit</Text>
-            </Pressable>
+          <View key={r.id} style={styles.rowCompact}>
+            <View style={styles.rowTop}>
+              <View style={styles.recordHeadLeft}>
+                <Text style={styles.recordTitle} numberOfLines={1}>{r.buyer_name}</Text>
+                <Text style={styles.recordDate}>{r.date}</Text>
+              </View>
+              <Pressable style={styles.editPill} onPress={() => startEdit(r)}>
+                <Text style={styles.link}>Edit</Text>
+              </Pressable>
+            </View>
+            <View style={styles.recordStatsCompact}>
+              <Text style={styles.statInline}>T {r.trays_sold}</Text>
+              <Text style={styles.statInline}>R {fmtInr(r.rate_per_tray)}</Text>
+              <Text style={styles.statInline}>E {fmtInr(roundMoney2(eggFromRow(r)))}</Text>
+              <Text style={[styles.statInline, styles.accentText]}>Amt {fmtInr(r.total_amount)}</Text>
+            </View>
           </View>
         )
       )}
@@ -261,15 +271,25 @@ export function SalesScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
+  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16 },
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
+  },
+  screenTitle: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
+  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
   muted: { padding: 16, color: "#71717a" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 16,
-    marginBottom: 20,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
   },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 8 },
   hint: { fontSize: 12, color: "#71717a", marginBottom: 12 },
@@ -326,14 +346,47 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#e5e7eb",
     padding: 12,
     marginBottom: 8,
   },
+  rowCompact: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  rowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 8,
+  },
+  recordHeadLeft: { flex: 1, paddingRight: 8 },
   rowEdit: { backgroundColor: "#fafafa" },
-  rowMain: { fontWeight: "700", color: "#18181b" },
-  rowSub: { fontSize: 13, color: "#52525b", marginTop: 4 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordStatsCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  editPill: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#ffffff",
+  },
   rowActions: { flexDirection: "row", gap: 16, marginTop: 8 },
-  link: { marginTop: 8, color: "#047857", fontWeight: "600", fontSize: 13 },
+  link: { color: "#047857", fontWeight: "700", fontSize: 13 },
   linkMuted: { color: "#71717a", fontWeight: "600", fontSize: 13 },
+  accentText: { color: "#047857" },
 });

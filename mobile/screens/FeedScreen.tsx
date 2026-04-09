@@ -15,7 +15,7 @@ import { apiFetch, type FeedRow, type Paginated } from "../lib/api";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 50;
 
 const fmtInr = (n: number) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(n);
@@ -173,6 +173,11 @@ export function FeedScreen() {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
     >
+      <View style={styles.headerCard}>
+        <Text style={styles.screenTitle}>Feed</Text>
+        <Text style={styles.screenSub}>Track stock movement and purchase cost</Text>
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.h2}>Add feed entry</Text>
         <Text style={styles.hint}>
@@ -283,19 +288,26 @@ export function FeedScreen() {
             </View>
           </View>
         ) : (
-          <View key={r.id} style={styles.row}>
-            <Text style={styles.rowMain}>{r.date}</Text>
-            <Text style={styles.rowSub}>
-              Open {(r.opening_balance_kg ?? 0).toFixed(2)} · In {r.feed_received.toFixed(2)} · Used{" "}
-              {r.feed_used.toFixed(2)} · Rem {r.feed_remaining.toFixed(2)} kg
-              {r.remaining_auto !== false ? " (auto)" : " (manual)"}
-              {r.purchase_cost_inr != null && r.purchase_cost_inr !== undefined
-                ? ` · Cost ${fmtInr(r.purchase_cost_inr)}`
-                : ""}
-            </Text>
-            <Pressable onPress={() => startEdit(r)}>
-              <Text style={styles.link}>Edit</Text>
-            </Pressable>
+          <View key={r.id} style={styles.rowCompact}>
+            <View style={styles.rowTop}>
+              <View style={styles.recordHeadLeft}>
+                <Text style={styles.recordTitle}>Feed entry</Text>
+                <Text style={styles.recordDate}>{r.date}</Text>
+              </View>
+              <Pressable style={styles.editPill} onPress={() => startEdit(r)}>
+                <Text style={styles.link}>Edit</Text>
+              </Pressable>
+            </View>
+            <View style={styles.recordStatsCompact}>
+              <Text style={styles.statInline}>O {(r.opening_balance_kg ?? 0).toFixed(2)}</Text>
+              <Text style={styles.statInline}>In {r.feed_received.toFixed(2)}</Text>
+              <Text style={styles.statInline}>U {r.feed_used.toFixed(2)}</Text>
+              <Text style={styles.statInline}>R {r.feed_remaining.toFixed(2)}</Text>
+              <Text style={[styles.statInline, styles.warnText]}>{r.remaining_auto !== false ? "Auto" : "Manual"}</Text>
+              {r.purchase_cost_inr != null && r.purchase_cost_inr !== undefined ? (
+                <Text style={[styles.statInline, styles.accentText]}>Cost {fmtInr(r.purchase_cost_inr)}</Text>
+              ) : null}
+            </View>
           </View>
         )
       )}
@@ -311,15 +323,25 @@ export function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
+  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16 },
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
+  },
+  screenTitle: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
+  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
   muted: { padding: 16, color: "#71717a" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 16,
-    marginBottom: 20,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
   },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 8 },
   hint: { fontSize: 12, color: "#71717a", marginBottom: 12 },
@@ -374,14 +396,47 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#e5e7eb",
     padding: 12,
     marginBottom: 8,
   },
+  rowCompact: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  rowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  recordHeadLeft: { flex: 1, paddingRight: 8 },
   rowEdit: { backgroundColor: "#fafafa" },
-  rowMain: { fontWeight: "700", color: "#18181b" },
-  rowSub: { fontSize: 13, color: "#52525b", marginTop: 4 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordStatsCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  editPill: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#ffffff",
+  },
   rowActions: { flexDirection: "row", gap: 16, marginTop: 8 },
-  link: { marginTop: 8, color: "#047857", fontWeight: "600", fontSize: 13 },
+  link: { color: "#047857", fontWeight: "700", fontSize: 13 },
   linkMuted: { color: "#71717a", fontWeight: "600", fontSize: 13 },
+  accentText: { color: "#047857" },
+  warnText: { color: "#b45309" },
 });

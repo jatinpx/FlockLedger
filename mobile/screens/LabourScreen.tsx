@@ -23,7 +23,7 @@ import {
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 50;
 const LEDGER_DEFAULT = 50;
 
 const fmtInr = (n: number) =>
@@ -392,6 +392,11 @@ export function LabourScreen() {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
     >
+      <View style={styles.headerCard}>
+        <Text style={styles.screenTitle}>Labour</Text>
+        <Text style={styles.screenSub}>Payroll, balances and ledger controls</Text>
+      </View>
+
       <View style={[styles.callout, isWorker && styles.calloutWorker]}>
         <Text style={[styles.calloutText, isWorker && styles.calloutTextWorker]}>
           {isWorker
@@ -499,20 +504,29 @@ export function LabourScreen() {
       {rows.map((r) => (
         <Pressable
           key={r.id}
-          style={[styles.row, selectedId === r.id && styles.rowSel]}
+          style={[styles.rowCompact, selectedId === r.id && styles.rowSel]}
           onPress={() => setSelectedId(r.id)}
         >
-          <Text style={styles.rowMain}>{r.full_name}</Text>
-          <Text style={styles.rowSub}>
-            {r.personnel_kind === "owner_pay" ? "Owner pay" : "Labour"} · {r.compensation_type} ·{" "}
-            {fmtInr(r.balance_due)} · {r.is_active ? "Active" : "Inactive"}
-            {r.linked_user_id != null ? ` · linked #${r.linked_user_id}` : ""}
-          </Text>
-          {canManage ? (
-            <Pressable onPress={() => void toggleActive(r)} style={{ marginTop: 8 }}>
-              <Text style={styles.link}>{r.is_active ? "Deactivate" : "Reactivate"}</Text>
-            </Pressable>
-          ) : null}
+          <View style={styles.rowTop}>
+            <View style={styles.recordHeadLeft}>
+              <Text style={styles.recordTitle} numberOfLines={1}>{r.full_name}</Text>
+              <Text style={styles.recordDate}>
+                {r.personnel_kind === "owner_pay" ? "Owner pay" : "Labour"} · {r.compensation_type}
+              </Text>
+            </View>
+            {canManage ? (
+              <Pressable onPress={() => void toggleActive(r)} style={styles.inlinePill}>
+                <Text style={styles.link}>{r.is_active ? "Deactivate" : "Reactivate"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={styles.recordStatsCompact}>
+            <Text style={[styles.statInline, styles.accentText]}>{fmtInr(r.balance_due)}</Text>
+            <Text style={[styles.statInline, r.is_active ? styles.accentText : styles.warnText]}>
+              {r.is_active ? "Active" : "Inactive"}
+            </Text>
+            {r.linked_user_id != null ? <Text style={styles.statInline}>linked #{r.linked_user_id}</Text> : null}
+          </View>
         </Pressable>
       ))}
       <PaginatedControls
@@ -713,7 +727,17 @@ export function LabourScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
+  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16 },
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
+  },
+  screenTitle: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
+  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
   muted: { padding: 16, color: "#71717a" },
   mutedSm: { fontSize: 13, color: "#71717a", marginBottom: 12 },
   callout: {
@@ -734,9 +758,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 16,
-    marginBottom: 20,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
   },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 12 },
   label: { fontSize: 12, color: "#52525b", fontWeight: "600", marginTop: 8 },
@@ -781,15 +805,49 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#e5e7eb",
     padding: 12,
     marginBottom: 8,
   },
+  rowCompact: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
   rowSel: { borderColor: "#047857", backgroundColor: "#f0fdf4" },
-  rowMain: { fontWeight: "700", color: "#18181b" },
-  rowSub: { fontSize: 13, color: "#52525b", marginTop: 4 },
-  link: { color: "#047857", fontWeight: "600", fontSize: 13 },
+  rowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 8,
+  },
+  recordHeadLeft: { flex: 1, paddingRight: 8 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordStatsCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  inlinePill: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#ffffff",
+  },
+  link: { color: "#047857", fontWeight: "700", fontSize: 13 },
   dangerLink: { color: "#b91c1c", fontWeight: "600", fontSize: 13, marginTop: 6 },
+  accentText: { color: "#047857" },
+  warnText: { color: "#b45309" },
   ledgerRow: {
     borderTopWidth: 1,
     borderTopColor: "#f4f4f5",

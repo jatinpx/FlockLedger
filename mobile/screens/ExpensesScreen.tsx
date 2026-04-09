@@ -24,7 +24,7 @@ import {
 import { pageQuery, withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 50;
 
 function expenseIsLinked(r: ExpenseRow): boolean {
   return r.labour_ledger_line_id != null || r.feed_inventory_id != null;
@@ -225,6 +225,11 @@ export function ExpensesScreen() {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
     >
+      <View style={styles.headerCard}>
+        <Text style={styles.screenTitle}>Expenses</Text>
+        <Text style={styles.screenSub}>Capture spend with labour/feed links</Text>
+      </View>
+
       <Modal
         visible={catPicker !== null}
         transparent
@@ -391,23 +396,28 @@ export function ExpensesScreen() {
             </View>
           </View>
         ) : (
-          <View key={r.id} style={styles.row}>
-            <Text style={styles.rowMain}>
-              {r.date} · {r.category}
-            </Text>
-            <Text style={styles.rowSub}>{fmtInr(r.amount)}</Text>
-            <Text style={styles.note}>{r.description ?? "—"}</Text>
+          <View key={r.id} style={styles.rowCompact}>
+            <View style={styles.rowTop}>
+              <View style={styles.recordHeadLeft}>
+                <Text style={styles.recordTitle} numberOfLines={1}>{r.category}</Text>
+                <Text style={styles.recordDate}>{r.date}</Text>
+              </View>
+              {canManage ? (
+                <Pressable onPress={() => startEdit(r)} disabled={expenseIsLinked(r)} style={styles.editPill}>
+                  <Text style={[styles.link, expenseIsLinked(r) && styles.linkDis]}>Edit</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <View style={styles.recordStatsCompact}>
+              <Text style={[styles.statInline, styles.accentText]}>{fmtInr(r.amount)}</Text>
+              {r.description ? <Text style={styles.statInline} numberOfLines={1}>Note {r.description}</Text> : null}
+            </View>
             {r.linked_labour_name ? (
               <Text style={styles.linkTag}>Worker: {r.linked_labour_name}</Text>
             ) : r.labour_ledger_line_id != null ? (
               <Text style={styles.linkTag}>Linked: labour payment</Text>
             ) : r.feed_inventory_id != null ? (
               <Text style={styles.linkTag}>Linked: feed entry</Text>
-            ) : null}
-            {canManage ? (
-              <Pressable onPress={() => startEdit(r)} disabled={expenseIsLinked(r)}>
-                <Text style={[styles.link, expenseIsLinked(r) && styles.linkDis]}>Edit</Text>
-              </Pressable>
             ) : null}
           </View>
         )
@@ -424,15 +434,25 @@ export function ExpensesScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16 },
+  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16 },
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
+  },
+  screenTitle: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
+  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
   muted: { padding: 16, color: "#71717a" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 16,
-    marginBottom: 20,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
   },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 8 },
   hint: { fontSize: 12, color: "#71717a", marginBottom: 12 },
@@ -470,20 +490,53 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#e5e7eb",
     padding: 12,
     marginBottom: 8,
   },
+  rowCompact: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  rowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    gap: 8,
+  },
   rowEdit: { backgroundColor: "#fafafa" },
-  rowMain: { fontWeight: "700", color: "#18181b" },
-  rowSub: { fontSize: 15, color: "#047857", fontWeight: "600", marginTop: 4 },
-  note: { fontSize: 13, color: "#52525b", marginTop: 4 },
+  recordHeadLeft: { flex: 1, paddingRight: 8 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordStatsCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  editPill: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+  },
   rowActions: { flexDirection: "row", gap: 16, marginTop: 8 },
-  link: { marginTop: 8, color: "#047857", fontWeight: "600", fontSize: 13 },
+  link: { color: "#047857", fontWeight: "700", fontSize: 13 },
   linkDis: { color: "#a1a1aa" },
   linkTag: { marginTop: 6, fontSize: 11, color: "#6366f1", fontWeight: "600" },
   linkMuted: { color: "#71717a", fontWeight: "600", fontSize: 13 },
   reqMark: { color: "#dc2626", fontWeight: "700" },
+  accentText: { color: "#047857" },
   modalRoot: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",

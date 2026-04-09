@@ -14,7 +14,7 @@ import { apiFetch, type EggProduction, type Paginated, type Shed } from "../lib/
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 50;
 
 export function ProductionScreen() {
   const { farmId } = useFarm();
@@ -257,34 +257,25 @@ export function ProductionScreen() {
             </View>
           </View>
         ) : (
-          <View key={r.id} style={styles.recordCard}>
-            <View style={styles.recordTopRow}>
-              <Text style={styles.recordTitle}>{sheds.find((s) => s.id === r.shed_id)?.name ?? `Shed ${r.shed_id}`}</Text>
-              <Text style={styles.recordDate}>{r.date}</Text>
+          <View key={r.id} style={styles.recordRowCard}>
+            <View style={styles.recordRowTop}>
+              <View style={styles.recordRowHeadLeft}>
+                <Text style={styles.recordTitle} numberOfLines={1}>
+                  {sheds.find((s) => s.id === r.shed_id)?.name ?? `Shed ${r.shed_id}`}
+                </Text>
+                <Text style={styles.recordDate}>{r.date}</Text>
+              </View>
+              <Pressable style={styles.inlineActionCompact} onPress={() => startEdit(r)}>
+                <Text style={styles.inlineActionText}>Edit</Text>
+              </Pressable>
             </View>
 
-            <View style={styles.statRow}>
-              <View style={styles.statChip}>
-                <Text style={styles.statChipLabel}>Produced</Text>
-                <Text style={styles.statChipValue}>{r.eggs_produced}</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Text style={styles.statChipLabel}>Broken</Text>
-                <Text style={[styles.statChipValue, styles.warnText]}>{r.broken_eggs}</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Text style={styles.statChipLabel}>Usable</Text>
-                <Text style={[styles.statChipValue, styles.accentText]}>{r.usable_eggs}</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Text style={styles.statChipLabel}>Trays</Text>
-                <Text style={styles.statChipValue}>{r.trays}</Text>
-              </View>
+            <View style={styles.recordStatsCompact}>
+              <Text style={styles.statInline}>P {r.eggs_produced}</Text>
+              <Text style={[styles.statInline, styles.accentText]}>U {r.usable_eggs}</Text>
+              <Text style={[styles.statInline, styles.warnText]}>B {r.broken_eggs}</Text>
+              <Text style={styles.statInline}>T {r.trays}</Text>
             </View>
-
-            <Pressable style={styles.inlineAction} onPress={() => startEdit(r)}>
-              <Text style={styles.inlineActionText}>Edit record</Text>
-            </Pressable>
           </View>
         )
       )}
@@ -398,38 +389,41 @@ const styles = StyleSheet.create({
   },
   ghostBtnText: { color: "#374151", fontWeight: "600" },
 
-  recordCard: {
+  recordRowCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    padding: 12,
-    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
   },
-  recordTopRow: {
+  recordRowTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 6,
   },
-  recordTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
-  recordDate: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
+  recordRowHeadLeft: { flex: 1, paddingRight: 8 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
 
-  statRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  statChip: {
-    minWidth: "47%",
-    flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#f9fafb",
+  recordStatsCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+
+  inlineActionCompact: {
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#ffffff",
   },
-  statChipLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", fontWeight: "700" },
-  statChipValue: { marginTop: 4, fontSize: 16, fontWeight: "700", color: "#111827" },
-
-  inlineAction: { marginTop: 10 },
   inlineActionText: { color: "#047857", fontWeight: "700", fontSize: 13 },
 
   editCard: {

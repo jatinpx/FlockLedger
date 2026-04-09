@@ -185,10 +185,16 @@ export function AnalyticsScreen() {
   return (
     <ScrollView
       style={styles.wrap}
+      contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={() => setTick((t) => t + 1)} />
       }
     >
+      <View style={styles.headerCard}>
+        <Text style={styles.screenTitle}>Analytics</Text>
+        <Text style={styles.screenSub}>Profit, eggs, feed and trends in one place</Text>
+      </View>
+
       {loading && !profit ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#047857" />
@@ -196,88 +202,105 @@ export function AnalyticsScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.hint}>Period mode</Text>
-      <View style={styles.chipRow}>
-        {PERIOD_MODES.map((mode) => (
-          <Pressable
-            key={mode}
-            style={[styles.chipSm, periodMode === mode && styles.chipOn]}
-            onPress={() => setPeriodMode(mode)}
-          >
-            <Text style={[styles.chipTextSm, periodMode === mode && styles.chipTextOn]}>
-              {periodModeLabel(mode)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>Period & Bucket</Text>
+        <Text style={styles.hint}>Period mode</Text>
+        <View style={styles.chipRow}>
+          {PERIOD_MODES.map((mode) => (
+            <Pressable
+              key={mode}
+              style={[styles.chipSm, periodMode === mode && styles.chipOn]}
+              onPress={() => setPeriodMode(mode)}
+            >
+              <Text style={[styles.chipTextSm, periodMode === mode && styles.chipTextOn]}>
+                {periodModeLabel(mode)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
-      {periodMode === "days" ? (
-        <>
-          <Text style={styles.hint}>Period (days)</Text>
-          <View style={styles.chipRow}>
-            {PERIOD_DAYS.map((d) => (
-              <Pressable
-                key={d}
-                style={[styles.chip, periodDays === d && styles.chipOn]}
-                onPress={() => setPeriodDays(d)}
-              >
-                <Text style={[styles.chipText, periodDays === d && styles.chipTextOn]}>
-                  {d === 365 ? "1y" : d === 180 ? "6m" : d === 90 ? "90d" : `${d}d`}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
-      ) : null}
+        {periodMode === "days" ? (
+          <>
+            <Text style={styles.hint}>Period (days)</Text>
+            <View style={styles.chipRow}>
+              {PERIOD_DAYS.map((d) => (
+                <Pressable
+                  key={d}
+                  style={[styles.chip, periodDays === d && styles.chipOn]}
+                  onPress={() => setPeriodDays(d)}
+                >
+                  <Text style={[styles.chipText, periodDays === d && styles.chipTextOn]}>
+                    {d === 365 ? "1y" : d === 180 ? "6m" : d === 90 ? "90d" : `${d}d`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
 
-      {periodMode === "range" || periodMode === "start_only" ? (
-        <>
-          <Text style={styles.hint}>Start date (YYYY-MM-DD)</Text>
-          <TextInput
-            style={styles.input}
-            value={startDate}
-            onChangeText={setStartDate}
-            autoCapitalize="none"
-            placeholder="2026-01-01"
-          />
-        </>
-      ) : null}
+        {periodMode === "range" || periodMode === "start_only" ? (
+          <>
+            <Text style={styles.hint}>Start date (YYYY-MM-DD)</Text>
+            <TextInput
+              style={styles.input}
+              value={startDate}
+              onChangeText={setStartDate}
+              autoCapitalize="none"
+              placeholder="2026-01-01"
+            />
+          </>
+        ) : null}
 
-      {periodMode === "range" || periodMode === "end_only" ? (
-        <>
-          <Text style={styles.hint}>End date (YYYY-MM-DD)</Text>
-          <TextInput
-            style={styles.input}
-            value={endDate}
-            onChangeText={setEndDate}
-            autoCapitalize="none"
-            placeholder="2026-12-31"
-          />
-        </>
-      ) : null}
-      <Text style={styles.hint}>Bucket</Text>
-      <View style={styles.chipRow}>
-        {GRANULARITY_OPTIONS.map((g) => (
-          <Pressable
-            key={g.value}
-            style={[styles.chipSm, granularity === g.value && styles.chipOn]}
-            onPress={() => setGranularity(g.value)}
-          >
-            <Text style={[styles.chipTextSm, granularity === g.value && styles.chipTextOn]}>
-              {g.label}
-            </Text>
-          </Pressable>
-        ))}
+        {periodMode === "range" || periodMode === "end_only" ? (
+          <>
+            <Text style={styles.hint}>End date (YYYY-MM-DD)</Text>
+            <TextInput
+              style={styles.input}
+              value={endDate}
+              onChangeText={setEndDate}
+              autoCapitalize="none"
+              placeholder="2026-12-31"
+            />
+          </>
+        ) : null}
+        <Text style={styles.hint}>Bucket</Text>
+        <View style={styles.chipRow}>
+          {GRANULARITY_OPTIONS.map((g) => (
+            <Pressable
+              key={g.value}
+              style={[styles.chipSm, granularity === g.value && styles.chipOn]}
+              onPress={() => setGranularity(g.value)}
+            >
+              <Text style={[styles.chipTextSm, granularity === g.value && styles.chipTextOn]}>
+                {g.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       {profit ? (
-        <View style={styles.card}>
+        <View style={styles.kpiGrid}>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>Revenue</Text>
+            <Text style={styles.kpiValue}>{fmtInr(profit.revenue)}</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>Expenses</Text>
+            <Text style={styles.kpiValue}>{fmtInr(profit.expenses)}</Text>
+          </View>
+          <View style={styles.kpiCardWide}>
+            <Text style={styles.kpiLabel}>Profit</Text>
+            <Text style={styles.kpiValueAccent}>{fmtInr(profit.profit)}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {profit ? (
+        <View style={styles.sectionCard}>
           <Text style={styles.h2}>
             Profit summary {profit.period_start} → {profit.period_end}
           </Text>
-          <Text style={styles.line}>Revenue: {fmtInr(profit.revenue)}</Text>
-          <Text style={styles.line}>Expenses: {fmtInr(profit.expenses)}</Text>
-          <Text style={styles.profitLine}>Profit: {fmtInr(profit.profit)}</Text>
           <Text style={styles.sub}>
             Expense mix: log {fmtInr(profit.expense_breakdown.expense_entries)} · unlinked labour{" "}
             {fmtInr(profit.expense_breakdown.unlinked_labour_payments)} · feed rows{" "}
@@ -291,32 +314,53 @@ export function AnalyticsScreen() {
 
       <Text style={styles.h2}>Eggs</Text>
       {eggs.map((row) => (
-        <View key={row.date} style={styles.row}>
-          <Text style={styles.rowMain}>{row.period_label || row.date}</Text>
-          <Text style={styles.rowSub}>
-            {row.usable_eggs} usable eggs · {row.trays} trays
-          </Text>
+        <View key={row.date} style={styles.compactRow}>
+          <View style={styles.rowTop}>
+            <View style={styles.recordHeadLeft}>
+              <Text style={styles.recordTitle}>{row.period_label || row.date}</Text>
+              <Text style={styles.recordDate}>{row.date}</Text>
+            </View>
+          </View>
+          <View style={styles.recordStatsCompact}>
+            <Text style={[styles.statInline, styles.accentText]}>U {row.usable_eggs}</Text>
+            <Text style={styles.statInline}>T {row.trays}</Text>
+          </View>
         </View>
       ))}
 
       <Text style={styles.h2}>Feed</Text>
       {feed.map((row) => (
-        <View key={row.date} style={styles.row}>
-          <Text style={styles.rowMain}>{row.period_label || row.date}</Text>
-          <Text style={styles.rowSub}>
-            In {row.feed_received.toFixed(2)} · Used {row.feed_used.toFixed(2)} · Rem{" "}
-            {row.feed_remaining.toFixed(2)} kg
-          </Text>
+        <View key={row.date} style={styles.compactRow}>
+          <View style={styles.rowTop}>
+            <View style={styles.recordHeadLeft}>
+              <Text style={styles.recordTitle}>{row.period_label || row.date}</Text>
+              <Text style={styles.recordDate}>{row.date}</Text>
+            </View>
+          </View>
+          <View style={styles.recordStatsCompact}>
+            <Text style={styles.statInline}>In {row.feed_received.toFixed(2)}</Text>
+            <Text style={styles.statInline}>U {row.feed_used.toFixed(2)}</Text>
+            <Text style={[styles.statInline, styles.accentText]}>R {row.feed_remaining.toFixed(2)}</Text>
+          </View>
         </View>
       ))}
 
       <Text style={styles.h2}>Profit by bucket</Text>
       {dailyProfit.map((row) => (
-        <View key={row.date} style={styles.row}>
-          <Text style={styles.rowMain}>{row.period_label || row.date}</Text>
-          <Text style={styles.rowSub}>
-            P/L {fmtInr(row.profit)} · Rev {fmtInr(row.revenue)} · Exp {fmtInr(row.expenses)}
-          </Text>
+        <View key={row.date} style={styles.compactRow}>
+          <View style={styles.rowTop}>
+            <View style={styles.recordHeadLeft}>
+              <Text style={styles.recordTitle}>{row.period_label || row.date}</Text>
+              <Text style={styles.recordDate}>{row.date}</Text>
+            </View>
+          </View>
+          <View style={styles.recordStatsCompact}>
+            <Text style={[styles.statInline, row.profit >= 0 ? styles.accentText : styles.warnText]}>
+              P {fmtInr(row.profit)}
+            </Text>
+            <Text style={styles.statInline}>R {fmtInr(row.revenue)}</Text>
+            <Text style={styles.statInline}>E {fmtInr(row.expenses)}</Text>
+          </View>
         </View>
       ))}
 
@@ -329,17 +373,53 @@ export function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16, paddingBottom: 32 },
+  wrap: { flex: 1, backgroundColor: "#f3f4f6" },
+  content: { padding: 16, paddingBottom: 32 },
   center: { padding: 24, alignItems: "center" },
   muted: { color: "#71717a", marginTop: 8 },
-  card: {
+
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 16,
+    marginBottom: 12,
+  },
+  screenTitle: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
+  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
+
+  sectionCard: {
     backgroundColor: "#fff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 16,
-    marginBottom: 20,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
   },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a", marginBottom: 6 },
+
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
+  kpiCard: {
+    width: "48%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    padding: 12,
+  },
+  kpiCardWide: {
+    width: "100%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    padding: 12,
+  },
+  kpiLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", fontWeight: "700" },
+  kpiValue: { fontSize: 18, fontWeight: "800", color: "#0f172a", marginTop: 4 },
+  kpiValueAccent: { fontSize: 20, fontWeight: "800", color: "#047857", marginTop: 4 },
+
   hint: { fontSize: 12, color: "#71717a", marginTop: 8, marginBottom: 6 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   chip: {
@@ -372,19 +452,34 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginTop: 16, marginBottom: 10 },
-  line: { fontSize: 15, color: "#3f3f46", marginTop: 6 },
-  profitLine: { fontSize: 16, fontWeight: "700", color: "#047857", marginTop: 8 },
   sub: { fontSize: 13, color: "#71717a", marginTop: 8 },
-  row: {
+  compactRow: {
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    padding: 10,
+    borderColor: "#e5e7eb",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  rowTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 6,
   },
-  rowMain: { fontWeight: "600", color: "#18181b" },
-  rowSub: { fontSize: 13, color: "#52525b", marginTop: 2 },
+  recordHeadLeft: { flex: 1, paddingRight: 8 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordStatsCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
+  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  accentText: { color: "#047857" },
+  warnText: { color: "#b45309" },
   json: {
     fontFamily: "monospace",
     fontSize: 11,

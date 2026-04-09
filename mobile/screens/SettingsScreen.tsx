@@ -327,9 +327,10 @@ export function SettingsScreen({ navigation }: Props) {
       style={styles.wrap}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reloadAll} />}
     >
-      <Text style={styles.h1}>
-        Settings{farmId ? ` · ${farmName}` : ""}
-      </Text>
+      <View style={styles.headerCard}>
+        <Text style={styles.h1}>Settings{farmId ? ` · ${farmName}` : ""}</Text>
+        <Text style={styles.headerSub}>Manage farm profile, sheds and members</Text>
+      </View>
 
       <Text style={styles.section}>Create farm</Text>
       <TextInput
@@ -565,8 +566,17 @@ export function SettingsScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#fafafa", padding: 16, paddingBottom: 40 },
-  h1: { fontSize: 18, fontWeight: "700", color: "#18181b", marginBottom: 16 },
+  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16, paddingBottom: 40 },
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 14,
+    marginBottom: 12,
+  },
+  h1: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
+  headerSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
   hint: { fontSize: 14, color: "#71717a", marginBottom: 12 },
   section: {
     fontSize: 13,
@@ -579,7 +589,7 @@ const styles = StyleSheet.create({
   sub: { fontSize: 12, color: "#71717a", marginBottom: 6 },
   input: {
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
@@ -597,15 +607,16 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.7 },
   btnText: { color: "#fff", fontWeight: "600" },
   card: {
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     backgroundColor: "#fff",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    marginBottom: 8,
+    borderColor: "#e5e7eb",
+    marginBottom: 6,
   },
   cardTitle: { fontWeight: "700", color: "#18181b" },
-  cardSub: { fontSize: 13, color: "#71717a", marginTop: 2 },
+  cardSub: { fontSize: 12, color: "#71717a", marginTop: 2 },
   roleLine: { marginTop: 6, fontSize: 13, color: "#3f3f46" },
   link: { marginTop: 6, color: "#047857", fontWeight: "600" },
   muted: { marginTop: 4, fontSize: 12, color: "#a1a1aa" },

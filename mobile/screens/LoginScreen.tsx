@@ -72,8 +72,10 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
       style={styles.wrap}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Text style={styles.title}>FlockLedger</Text>
-      <Text style={styles.sub}>{mode === "login" ? "Sign in" : "Create account"}</Text>
+      <View style={styles.headerCard}>
+        <Text style={styles.title}>FlockLedger</Text>
+        <Text style={styles.sub}>{mode === "login" ? "Sign in" : "Create account"}</Text>
+      </View>
       <View style={styles.modeRow}>
         <Pressable
           style={[styles.modeBtn, mode === "login" && styles.modeBtnOn]}
@@ -141,13 +143,21 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "#fafafa" },
-  title: { fontSize: 28, fontWeight: "700", color: "#065f46" },
-  sub: { marginTop: 4, marginBottom: 24, color: "#71717a" },
+  wrap: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "#f3f4f6" },
+  headerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    padding: 16,
+    marginBottom: 12,
+  },
+  title: { fontSize: 30, fontWeight: "800", color: "#065f46" },
+  sub: { marginTop: 4, color: "#6b7280" },
   modeRow: {
     flexDirection: "row",
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#d1d5db",
     borderRadius: 8,
     overflow: "hidden",
     marginBottom: 12,
@@ -164,7 +174,7 @@ const styles = StyleSheet.create({
   modeBtnTextOn: { color: "#065f46" },
   input: {
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
