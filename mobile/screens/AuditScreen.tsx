@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type AuditLogRow, type Paginated } from "../lib/api";
 import { withPagination } from "../lib/pagination";
@@ -35,6 +36,7 @@ function resourceLabel(resourceType: string, resourceId: number | null): string 
 
 export function AuditScreen() {
   const { farmId, farms } = useFarm();
+  const isFocused = useIsFocused();
   const current = farms.find((f) => f.id === farmId);
   const canView = current?.my_role === "owner" || current?.my_role === "manager";
 
@@ -69,8 +71,9 @@ export function AuditScreen() {
   }, [limit, farmId]);
 
   useEffect(() => {
+    if (!isFocused) return;
     load();
-  }, [load]);
+  }, [isFocused, load]);
 
   if (!farmId) {
     return (

@@ -1,10 +1,14 @@
 import datetime as dt
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.production import Expense
 
 
 class FarmLabour(Base):
@@ -36,6 +40,11 @@ class FarmLabour(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    farm: Mapped["Farm"] = relationship("Farm", back_populates="labour")
+    ledger_lines: Mapped[list["LabourLedgerLine"]] = relationship(
+        "LabourLedgerLine", cascade="all, delete-orphan", back_populates="labour"
+    )
+
 
 class LabourLedgerLine(Base):
     """earning = farm owes more; payment = farm paid labour; adjustment = signed correction."""
@@ -50,7 +59,9 @@ class LabourLedgerLine(Base):
     # earning, payment, adjustment
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     description: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    labour: Mapped["FarmLabour"] = relationship("FarmLabour", back_populates="ledger_lines")

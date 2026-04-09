@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type EggProduction, type Paginated, type Shed } from "../lib/api";
 import { withPagination } from "../lib/pagination";
@@ -18,6 +19,7 @@ const DEFAULT_LIMIT = 50;
 
 export function ProductionScreen() {
   const { farmId } = useFarm();
+  const isFocused = useIsFocused();
   const [sheds, setSheds] = useState<Shed[]>([]);
   const [rows, setRows] = useState<EggProduction[]>([]);
   const [total, setTotal] = useState(0);
@@ -63,8 +65,9 @@ export function ProductionScreen() {
   }, [limit, farmId]);
 
   useEffect(() => {
+    if (!isFocused) return;
     refresh();
-  }, [refresh]);
+  }, [isFocused, refresh]);
 
   async function submit() {
     if (!farmId) return;

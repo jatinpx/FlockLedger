@@ -35,6 +35,13 @@ class SaleCreate(BaseModel):
             raise ValueError("rate must be >= 0")
         return v
 
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v
+
     @model_validator(mode="wrap")
     @classmethod
     def derive_tray_from_egg(
@@ -86,3 +93,9 @@ class SaleUpdate(BaseModel):
     rate_per_egg: Decimal | None = Field(None, ge=0)
     total_amount: Decimal | None = Field(None, ge=0)
     date: Date | None = None
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date | None) -> Date | None:
+        if v is not None and v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v

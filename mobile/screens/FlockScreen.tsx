@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import {
   apiFetch,
@@ -39,6 +40,7 @@ function kindLabel(k: string): string {
 
 export function FlockScreen() {
   const { farms, farmId } = useFarm();
+  const isFocused = useIsFocused();
   const current = farms.find((f) => f.id === farmId);
   const canManage = current?.my_role === "owner" || current?.my_role === "manager";
   const canPost =
@@ -113,14 +115,16 @@ export function FlockScreen() {
 
   useEffect(() => {
     if (!farmId) return;
+    if (!isFocused) return;
     setLoading(true);
     refreshSummary().finally(() => setLoading(false));
-  }, [farmId, refreshSummary]);
+  }, [farmId, isFocused, refreshSummary]);
 
   useEffect(() => {
     if (!farmId) return;
+    if (!isFocused) return;
     refreshEvents();
-  }, [farmId, limit, offset, refreshEvents]);
+  }, [farmId, isFocused, limit, offset, refreshEvents]);
 
   useEffect(() => {
     if (shedId == null && sheds.length > 0) {

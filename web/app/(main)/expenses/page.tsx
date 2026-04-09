@@ -30,8 +30,10 @@ function categoryOptionsWithLegacy(predefined: string[], current: string): strin
 }
 
 export default function ExpensesPage() {
-  const { farmId } = useFarm();
+  const { farmId, farms } = useFarm();
   const runLoaded = useAsyncLoader();
+  const current = farms.find((f) => f.id === farmId);
+  const canManage = current?.my_role === "owner" || current?.my_role === "manager";
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
@@ -107,12 +109,24 @@ export default function ExpensesPage() {
     };
   }, [farmId]);
 
+  useEffect(() => {
+    if (!wageLabourId) return;
+    const selectedId = parseInt(wageLabourId, 10);
+    if (Number.isNaN(selectedId)) {
+      setWageLabourId("");
+      return;
+    }
+    if (!activeLabour.some((row) => row.id === selectedId)) {
+      setWageLabourId("");
+    }
+  }, [activeLabour, wageLabourId]);
+
   const miscNeedsDescription = category === MISCELLANEOUS_EXPENSE_CATEGORY;
   const editMiscNeedsDescription = editCategory === MISCELLANEOUS_EXPENSE_CATEGORY;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!farmId) return;
+    if (!farmId || !canManage) return;
     const descTrim = description.trim();
     if (miscNeedsDescription && !descTrim) {
       toastError(new Error("Add a short description for Miscellaneous expenses."));
@@ -146,6 +160,7 @@ export default function ExpensesPage() {
   }
 
   function startEdit(r: ExpenseRow) {
+    if (!canManage) return;
     if (expenseIsLinked(r)) {
       toastError(
         new Error(
@@ -162,7 +177,7 @@ export default function ExpensesPage() {
   }
 
   async function saveEdit() {
-    if (!farmId || editingId == null) return;
+    if (!farmId || editingId == null || !canManage) return;
     const editDescTrim = editDescription.trim();
     if (editMiscNeedsDescription && !editDescTrim) {
       toastError(new Error("Add a short description for Miscellaneous expenses."));
@@ -199,16 +214,17 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-8">
-      <form
-        onSubmit={submit}
-        className="max-w-lg space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-      >
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add expense</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Managers and owners can add expenses. Workers can view the list. For{" "}
-          <strong>Labour &amp; wages</strong>, choose a worker to record a payment and link this expense.
-          Feed purchase cost can be set on the Feed page.
-        </p>
+      {canManage ? (
+        <form
+          onSubmit={submit}
+          className="max-w-lg space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add expense</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Managers and owners can add expenses. Workers can view the list. For{" "}
+            <strong>Labour &amp; wages</strong>, choose a worker to record a payment and link this expense.
+            Feed purchase cost can be set on the Feed page.
+          </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="text-sm text-zinc-600 dark:text-zinc-400">Category</label>
@@ -302,7 +318,12 @@ export default function ExpensesPage() {
         >
           Save
         </button>
-      </form>
+        </form>
+      ) : (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Workers can view expenses. Ask a manager or owner to add or edit entries.
+        </p>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="overflow-x-auto">
@@ -320,7 +341,7 @@ export default function ExpensesPage() {
             </thead>
             <tbody>
               {rows.map((r) =>
-                editingId === r.id ? (
+                editingId === r.id && canManage ? (
                   <tr key={r.id} className="border-b border-zinc-50 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/80">
                     <td className="px-4 py-2 align-top">
                       <input
@@ -412,14 +433,16 @@ export default function ExpensesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
-                        onClick={() => startEdit(r)}
-                        disabled={expenseIsLinked(r)}
-                      >
-                        Edit
-                      </button>
+                      {canManage ? (
+                        <button
+                          type="button"
+                          className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+                          onClick={() => startEdit(r)}
+                          disabled={expenseIsLinked(r)}
+                        >
+                          Edit
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 )

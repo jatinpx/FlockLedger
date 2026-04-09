@@ -7,7 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.production import EggProduction
+    from app.models.labour import FarmLabour, LabourLedgerLine
+    from app.models.production import EggProduction, FeedInventory, Sale, Expense
+    from app.models.flock import FlockEvent
+    from app.models.audit_log import AuditLog
     from app.models.user import User
 
 
@@ -28,6 +31,27 @@ class Farm(Base):
     )
     sheds: Mapped[list["Shed"]] = relationship(
         "Shed", back_populates="farm", cascade="all, delete-orphan"
+    )
+    labour: Mapped[list["FarmLabour"]] = relationship(
+        "FarmLabour", back_populates="farm", cascade="all, delete-orphan"
+    )
+    labour_ledger_lines: Mapped[list["LabourLedgerLine"]] = relationship(
+        "LabourLedgerLine", cascade="all, delete-orphan"
+    )
+    feed_inventory: Mapped[list["FeedInventory"]] = relationship(
+        "FeedInventory", cascade="all, delete-orphan"
+    )
+    sales: Mapped[list["Sale"]] = relationship(
+        "Sale", cascade="all, delete-orphan"
+    )
+    expenses: Mapped[list["Expense"]] = relationship(
+        "Expense", cascade="all, delete-orphan"
+    )
+    flock_events: Mapped[list["FlockEvent"]] = relationship(
+        "FlockEvent", cascade="all, delete-orphan"
+    )
+    audit_logs: Mapped[list["AuditLog"]] = relationship(
+        "AuditLog", cascade="all, delete-orphan"
     )
 
 

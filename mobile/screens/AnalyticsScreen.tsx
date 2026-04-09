@@ -9,6 +9,7 @@ import {
   Pressable,
   TextInput,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type Paginated, type ProfitSummaryOut } from "../lib/api";
 import { withPagination } from "../lib/pagination";
@@ -37,6 +38,7 @@ const fmtInr = (n: number) =>
 /** Same data as web analytics; charts replaced with scrollable lists + JSON for ML. */
 export function AnalyticsScreen() {
   const { farmId } = useFarm();
+  const isFocused = useIsFocused();
   const [periodMode, setPeriodMode] = useState<(typeof PERIOD_MODES)[number]>("days");
   const [periodDays, setPeriodDays] = useState<number>(30);
   const [startDate, setStartDate] = useState<string>("");
@@ -65,6 +67,7 @@ export function AnalyticsScreen() {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    if (!isFocused) return;
     if (!farmId) return;
     if (periodMode === "range" && (!startDate || !endDate)) {
       setLoading(false);
@@ -165,7 +168,7 @@ export function AnalyticsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, tick, periodMode, periodDays, startDate, endDate, granularity]);
+  }, [isFocused, farmId, tick, periodMode, periodDays, startDate, endDate, granularity]);
 
   if (!farmId) {
     return <Text style={styles.muted}>Select or create a farm in Settings.</Text>;
@@ -313,8 +316,8 @@ export function AnalyticsScreen() {
       ) : null}
 
       <Text style={styles.h2}>Eggs</Text>
-      {eggs.map((row) => (
-        <View key={row.date} style={styles.compactRow}>
+      {eggs.map((row, i) => (
+        <View key={`egg-${row.date}-${i}`} style={styles.compactRow}>
           <View style={styles.rowTop}>
             <View style={styles.recordHeadLeft}>
               <Text style={styles.recordTitle}>{row.period_label || row.date}</Text>
@@ -329,8 +332,8 @@ export function AnalyticsScreen() {
       ))}
 
       <Text style={styles.h2}>Feed</Text>
-      {feed.map((row) => (
-        <View key={row.date} style={styles.compactRow}>
+      {feed.map((row, i) => (
+        <View key={`feed-${row.date}-${i}`} style={styles.compactRow}>
           <View style={styles.rowTop}>
             <View style={styles.recordHeadLeft}>
               <Text style={styles.recordTitle}>{row.period_label || row.date}</Text>
@@ -346,8 +349,8 @@ export function AnalyticsScreen() {
       ))}
 
       <Text style={styles.h2}>Profit by bucket</Text>
-      {dailyProfit.map((row) => (
-        <View key={row.date} style={styles.compactRow}>
+      {dailyProfit.map((row, i) => (
+        <View key={`profit-${row.date}-${i}`} style={styles.compactRow}>
           <View style={styles.rowTop}>
             <View style={styles.recordHeadLeft}>
               <Text style={styles.recordTitle}>{row.period_label || row.date}</Text>

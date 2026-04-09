@@ -19,7 +19,7 @@ class FlockEvent(Base):
     # mortality, cull, live_sale, transfer_out, purchase, transfer_in, count_adjust
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

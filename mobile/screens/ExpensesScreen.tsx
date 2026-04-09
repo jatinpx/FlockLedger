@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import {
   apiFetch,
@@ -42,6 +43,7 @@ function categoryOptionsWithLegacy(predefined: string[], current: string): strin
 
 export function ExpensesScreen() {
   const { farmId, farms } = useFarm();
+  const isFocused = useIsFocused();
   const current = farms.find((f) => f.id === farmId);
   const canManage = current?.my_role === "owner" || current?.my_role === "manager";
 
@@ -88,8 +90,9 @@ export function ExpensesScreen() {
   }, [limit, farmId]);
 
   useEffect(() => {
+    if (!isFocused) return;
     refresh();
-  }, [refresh]);
+  }, [isFocused, refresh]);
 
   useEffect(() => {
     fetchExpenseCategories()
@@ -125,6 +128,13 @@ export function ExpensesScreen() {
       cancelled = true;
     };
   }, [farmId]);
+
+  useEffect(() => {
+    if (wageLabourId == null) return;
+    if (!activeLabour.some((row) => row.id === wageLabourId)) {
+      setWageLabourId(null);
+    }
+  }, [activeLabour, wageLabourId]);
 
   const miscNeedsDescription = category === MISCELLANEOUS_EXPENSE_CATEGORY;
   const editMiscNeedsDescription = editCategory === MISCELLANEOUS_EXPENSE_CATEGORY;
@@ -215,10 +225,8 @@ export function ExpensesScreen() {
       ? categoryOptionsWithLegacy(categories, editCategory)
       : categories;
 
-  const wagePayLabel =
-    wageLabourId == null
-      ? "Not linked (e.g. contractor)"
-      : activeLabour.find((x) => x.id === wageLabourId)?.full_name ?? `Worker #${wageLabourId}`;
+  const selectedWageLabour = activeLabour.find((x) => x.id === wageLabourId);
+  const wagePayLabel = selectedWageLabour?.full_name ?? "Not linked (e.g. contractor)";
 
   return (
     <ScrollView

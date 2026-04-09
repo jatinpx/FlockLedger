@@ -10,6 +10,13 @@ class EggProductionCreate(BaseModel):
     eggs_produced: int = Field(..., ge=0)
     broken_eggs: int = Field(0, ge=0)
 
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v
+
     @model_validator(mode="after")
     def broken_lte_total(self):
         if self.broken_eggs > self.eggs_produced:
@@ -43,8 +50,15 @@ class FeedInventoryCreate(BaseModel):
     purchase_cost_inr: float | None = Field(
         None,
         ge=0,
-        description="Optional cash paid for feed received (counts toward P&L; no separate expense needed).",
+        description="Optional cash paid for feed received (counts toward P&L and is mirrored into Expenses).",
     )
+
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v
 
 
 class FeedInventoryOut(BaseModel):
@@ -82,6 +96,13 @@ class FeedInventoryUpdate(BaseModel):
         description="Set to null in JSON to clear purchase cost on this row.",
     )
 
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date | None) -> Date | None:
+        if v is not None and v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v
+
     @field_validator("purchase_cost_inr")
     @classmethod
     def purchase_cost_nonneg(cls, v: float | None) -> float | None:
@@ -95,3 +116,9 @@ class EggProductionPatch(BaseModel):
     date: Date | None = None
     eggs_produced: int | None = Field(None, ge=0)
     broken_eggs: int | None = Field(None, ge=0)
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date | None) -> Date | None:
+        if v is not None and v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v

@@ -9,6 +9,7 @@ import {
   Pressable,
   TextInput,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import {
   apiFetch,
@@ -30,6 +31,7 @@ function periodModeLabel(mode: (typeof PERIOD_MODES)[number]): string {
 }
 export function DashboardScreen() {
   const { farmId } = useFarm();
+  const isFocused = useIsFocused();
   const [periodMode, setPeriodMode] = useState<(typeof PERIOD_MODES)[number]>("days");
   const [periodDays, setPeriodDays] = useState<number>(30);
   const [startDate, setStartDate] = useState<string>("");
@@ -42,6 +44,7 @@ export function DashboardScreen() {
   const [live, setLive] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isFocused) return;
     if (!farmId) return;
     if (periodMode === "range" && (!startDate || !endDate)) {
       setLoading(false);
@@ -88,7 +91,7 @@ export function DashboardScreen() {
     return () => {
       cancelled = true;
     };
-  }, [farmId, retryTick, periodMode, periodDays, startDate, endDate]);
+  }, [isFocused, farmId, retryTick, periodMode, periodDays, startDate, endDate]);
 
   useEffect(() => {
     if (!farmId) return;
@@ -337,7 +340,7 @@ export function DashboardScreen() {
             <Text style={styles.splitVal}>{fmtInr(profit.expense_breakdown.unlinked_labour_payments)}</Text>
           </View>
           <View style={styles.splitRowLast}>
-            <Text style={styles.splitKey}>Feed purchase on entries</Text>
+            <Text style={styles.splitKey}>Feed purchase (not in log)</Text>
             <Text style={styles.splitVal}>{fmtInr(profit.expense_breakdown.feed_purchase_cost_on_entries)}</Text>
           </View>
 

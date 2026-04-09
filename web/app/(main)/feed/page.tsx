@@ -168,7 +168,7 @@ export default function FeedPage() {
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Remaining is calculated as opening stock + received − used. Use a manual remaining only
           for physical count corrections. Optional <strong>purchase cost (₹)</strong> counts toward
-          profit without a separate expense entry.
+          profit and is also added to Expenses.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">

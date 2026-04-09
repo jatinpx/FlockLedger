@@ -2,7 +2,7 @@ from datetime import date as Date
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 
 class FarmLabourCreate(BaseModel):
@@ -24,6 +24,13 @@ class FarmLabourCreate(BaseModel):
         None,
         description="Farm member (worker role) who may view only this labour record in the app",
     )
+
+    @field_validator("hired_at")
+    @classmethod
+    def hired_at_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("hired_at cannot be in the future")
+        return v
 
 
 class FarmLabourPatch(BaseModel):
@@ -67,6 +74,13 @@ class LabourLedgerCreate(BaseModel):
         True,
         description="Ignored: payments always create a linked P&L expense. Kept for API compatibility.",
     )
+
+    @field_validator("line_date")
+    @classmethod
+    def line_date_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("line_date cannot be in the future")
+        return v
 
     @model_validator(mode="after")
     def amount_rules(self):

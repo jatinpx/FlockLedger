@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type Paginated, type SaleRow } from "../lib/api";
 import { withPagination } from "../lib/pagination";
@@ -28,6 +29,7 @@ const fmtInr = (n: number) =>
 
 export function SalesScreen() {
   const { farmId } = useFarm();
+  const isFocused = useIsFocused();
   const [rows, setRows] = useState<SaleRow[]>([]);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
@@ -68,8 +70,9 @@ export function SalesScreen() {
   }, [limit, farmId]);
 
   useEffect(() => {
+    if (!isFocused) return;
     refresh();
-  }, [refresh]);
+  }, [isFocused, refresh]);
 
   async function submit() {
     if (!farmId) return;
@@ -114,8 +117,9 @@ export function SalesScreen() {
     setEditingId(r.id);
     setEditBuyer(r.buyer_name);
     setEditTrays(String(r.trays_sold));
-    setEditRateBasis("tray");
-    setEditRateInput(String(r.rate_per_tray));
+    const detectedBasis: RateBasis = r.rate_per_egg != null ? "egg" : "tray";
+    setEditRateBasis(detectedBasis);
+    setEditRateInput(String(detectedBasis === "egg" ? r.rate_per_egg : r.rate_per_tray));
     setEditDate(r.date);
   }
 
@@ -212,23 +216,19 @@ export function SalesScreen() {
       {rows.map((r) =>
         editingId === r.id ? (
           <View key={r.id} style={[styles.row, styles.rowEdit]}>
+            <Text style={styles.editTitle}>Edit sale</Text>
+            <Text style={styles.label}>Buyer</Text>
             <TextInput style={styles.inputSm} value={editBuyer} onChangeText={setEditBuyer} />
+            <Text style={styles.label}>Trays sold</Text>
             <TextInput style={styles.inputSm} value={editTrays} onChangeText={setEditTrays} keyboardType="number-pad" />
-            <View style={styles.basisRow}>
-              <Pressable
-                onPress={() => setEditRateBasis("tray")}
-                style={[styles.basisChipSm, editRateBasis === "tray" && styles.basisChipOn]}
-              >
-                <Text style={[styles.basisChipTextSm, editRateBasis === "tray" && styles.basisChipTextOn]}>Tray</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setEditRateBasis("egg")}
-                style={[styles.basisChipSm, editRateBasis === "egg" && styles.basisChipOn]}
-              >
-                <Text style={[styles.basisChipTextSm, editRateBasis === "egg" && styles.basisChipTextOn]}>Egg</Text>
-              </Pressable>
+            <Text style={styles.label}>Price basis</Text>
+            <View style={styles.readonlyPill}>
+              <Text style={styles.readonlyPillText}>{editRateBasis === "tray" ? "₹ / tray" : "₹ / egg"}</Text>
             </View>
+            <Text style={styles.infoText}>Price basis is fixed for existing entries.</Text>
+            <Text style={styles.label}>{editRateBasis === "tray" ? "Rate per tray (₹)" : "Rate per egg (₹)"}</Text>
             <TextInput style={styles.inputSm} value={editRateInput} onChangeText={setEditRateInput} keyboardType="decimal-pad" />
+            <Text style={styles.label}>Date</Text>
             <TextInput style={styles.inputSm} value={editDate} onChangeText={setEditDate} />
             <View style={styles.rowActions}>
               <Pressable onPress={saveEdit} disabled={saving}>
@@ -251,9 +251,9 @@ export function SalesScreen() {
               </Pressable>
             </View>
             <View style={styles.recordStatsCompact}>
-              <Text style={styles.statInline}>T {r.trays_sold}</Text>
-              <Text style={styles.statInline}>R {fmtInr(r.rate_per_tray)}</Text>
-              <Text style={styles.statInline}>E {fmtInr(roundMoney2(eggFromRow(r)))}</Text>
+              <Text style={[styles.statInline, styles.statTrays]}>T {r.trays_sold}</Text>
+              <Text style={[styles.statInline, styles.statRateTray]}>R {fmtInr(r.rate_per_tray)}</Text>
+              <Text style={[styles.statInline, styles.statRateEgg]}>E {fmtInr(roundMoney2(eggFromRow(r)))}</Text>
               <Text style={[styles.statInline, styles.accentText]}>Amt {fmtInr(r.total_amount)}</Text>
             </View>
           </View>
@@ -331,6 +331,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 13,
   },
+  editTitle: { fontSize: 14, fontWeight: "800", color: "#0f172a", marginBottom: 4 },
+  readonlyPill: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: "flex-start",
+    backgroundColor: "#f9fafb",
+  },
+  readonlyPillText: { fontSize: 12, fontWeight: "700", color: "#374151" },
+  infoText: { fontSize: 11, color: "#6b7280", marginTop: 6, marginBottom: 2 },
   btn: {
     marginTop: 16,
     backgroundColor: "#047857",
@@ -377,6 +390,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  statTrays: { color: "#2563eb" },
+  statRateTray: { color: "#7c3aed" },
+  statRateEgg: { color: "#b45309" },
   editPill: {
     borderWidth: 1,
     borderColor: "#d1d5db",

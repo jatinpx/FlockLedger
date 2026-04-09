@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.analytics_params import list_optional_date_range
 from app.api.farm_access import require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
+from app.constants.expense_categories import FEED_FODDER_CATEGORY
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
 from app.models import Expense, FeedInventory
@@ -53,6 +54,102 @@ def _row_dict(r: FeedInventory) -> dict:
         "remaining_manual": r.remaining_manual,
         "purchase_cost_inr": float(r.purchase_cost_inr) if r.purchase_cost_inr is not None else None,
     }
+
+
+def _expense_row_dict(e: Expense) -> dict:
+    return {
+        "category": e.category,
+        "amount": float(e.amount),
+        "description": e.description,
+        "date": str(e.date),
+        "labour_ledger_line_id": e.labour_ledger_line_id,
+        "feed_inventory_id": e.feed_inventory_id,
+    }
+
+
+def _sync_feed_purchase_expense(
+    db: Session,
+    *,
+    farm_id: int,
+    feed_row: FeedInventory,
+    acting_user_id: int,
+    ip: str | None,
+) -> None:
+    linked = (
+        db.query(Expense)
+        .filter(
+            Expense.farm_id == farm_id,
+            Expense.feed_inventory_id == feed_row.id,
+        )
+        .first()
+    )
+
+    if feed_row.purchase_cost_inr is None:
+        if linked is None:
+            return
+        before = _expense_row_dict(linked)
+        record_audit(
+            db,
+            user_id=acting_user_id,
+            farm_id=farm_id,
+            action="delete",
+            resource_type="expense",
+            resource_id=linked.id,
+            before=before,
+            after=None,
+            ip=ip,
+        )
+        deleted_id = linked.id
+        db.delete(linked)
+        publish_farm_event(farm_id, "expense_deleted", {"id": deleted_id})
+        return
+
+    amount = Decimal(str(feed_row.purchase_cost_inr))
+    description = f"Feed purchase cost — {feed_row.date.isoformat()}"
+
+    if linked is None:
+        row = Expense(
+            farm_id=farm_id,
+            category=FEED_FODDER_CATEGORY,
+            amount=amount,
+            description=description,
+            date=feed_row.date,
+            feed_inventory_id=feed_row.id,
+        )
+        db.add(row)
+        db.flush()
+        record_audit(
+            db,
+            user_id=acting_user_id,
+            farm_id=farm_id,
+            action="create",
+            resource_type="expense",
+            resource_id=row.id,
+            before=None,
+            after=_expense_row_dict(row),
+            ip=ip,
+        )
+        publish_farm_event(farm_id, "expense_created", {"id": row.id})
+        return
+
+    before = _expense_row_dict(linked)
+    linked.category = FEED_FODDER_CATEGORY
+    linked.amount = amount
+    linked.description = description
+    linked.date = feed_row.date
+    after = _expense_row_dict(linked)
+    record_audit(
+        db,
+        user_id=acting_user_id,
+        farm_id=farm_id,
+        action="update",
+        resource_type="expense",
+        resource_id=linked.id,
+        before=before,
+        after=after,
+        ip=ip,
+    )
+    publish_farm_event(farm_id, "expense_updated", {"id": linked.id})
 
 
 @router.get("/preview-opening")
@@ -102,6 +199,13 @@ def create_feed_entry(
     )
     db.add(row)
     db.flush()
+    _sync_feed_purchase_expense(
+        db,
+        farm_id=farm_id,
+        feed_row=row,
+        acting_user_id=user.id,
+        ip=ip,
+    )
     record_audit(
         db,
         user_id=user.id,
@@ -161,19 +265,24 @@ def patch_feed_entry(
 
     if "purchase_cost_inr" in data:
         if data["purchase_cost_inr"] is not None:
-            linked = (
-                db.query(Expense)
-                .filter(Expense.feed_inventory_id == record_id)
-                .first()
-            )
-            if linked:
-                raise HTTPException(
-                    status_code=400,
-                    detail="This feed row has a linked expense entry; remove or edit that expense instead of setting purchase cost here.",
-                )
             row.purchase_cost_inr = Decimal(str(data["purchase_cost_inr"]))
         else:
             row.purchase_cost_inr = None
+
+    if (
+        "purchase_cost_inr" in data
+        or "date" in data
+        or "feed_received" in data
+        or "feed_used" in data
+        or "feed_remaining" in data
+    ):
+        _sync_feed_purchase_expense(
+            db,
+            farm_id=farm_id,
+            feed_row=row,
+            acting_user_id=user.id,
+            ip=ip,
+        )
 
     after = _row_dict(row)
     record_audit(
@@ -231,11 +340,27 @@ def delete_feed(
     )
     if not row:
         raise HTTPException(status_code=404, detail="Not found")
-    if db.query(Expense).filter(Expense.feed_inventory_id == record_id).first():
-        raise HTTPException(
-            status_code=400,
-            detail="Delete the linked expense for this feed row first.",
+    linked_expense = (
+        db.query(Expense)
+        .filter(Expense.farm_id == farm_id, Expense.feed_inventory_id == record_id)
+        .first()
+    )
+    if linked_expense:
+        exp_before = _expense_row_dict(linked_expense)
+        record_audit(
+            db,
+            user_id=user.id,
+            farm_id=farm_id,
+            action="delete",
+            resource_type="expense",
+            resource_id=linked_expense.id,
+            before=exp_before,
+            after=None,
+            ip=ip,
         )
+        linked_id = linked_expense.id
+        db.delete(linked_expense)
+        publish_farm_event(farm_id, "expense_deleted", {"id": linked_id})
     before = _row_dict(row)
     record_audit(
         db,

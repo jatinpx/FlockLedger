@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Switch,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type FeedRow, type Paginated } from "../lib/api";
 import { withPagination } from "../lib/pagination";
@@ -22,6 +23,7 @@ const fmtInr = (n: number) =>
 
 export function FeedScreen() {
   const { farmId } = useFarm();
+  const isFocused = useIsFocused();
   const [rows, setRows] = useState<FeedRow[]>([]);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
@@ -65,8 +67,9 @@ export function FeedScreen() {
   }, [limit, farmId]);
 
   useEffect(() => {
+    if (!isFocused) return;
     refresh();
-  }, [refresh]);
+  }, [isFocused, refresh]);
 
   useEffect(() => {
     if (!farmId) {
@@ -182,7 +185,7 @@ export function FeedScreen() {
         <Text style={styles.h2}>Add feed entry</Text>
         <Text style={styles.hint}>
           Remaining is opening + received − used unless you override with a physical count. Optional
-          purchase cost (₹) counts toward profit without a separate expense.
+          purchase cost (₹) counts toward profit and is also added to Expenses.
         </Text>
         <Text style={styles.label}>Date</Text>
         <TextInput style={styles.input} value={date} onChangeText={setDate} />
@@ -243,29 +246,45 @@ export function FeedScreen() {
       {rows.map((r) =>
         editingId === r.id ? (
           <View key={r.id} style={[styles.row, styles.rowEdit]}>
+            <Text style={styles.editTitle}>Edit feed entry</Text>
             <Text style={styles.editMeta}>
               Open {(r.opening_balance_kg ?? 0).toFixed(2)} kg
             </Text>
+            <Text style={styles.label}>Date</Text>
             <TextInput style={styles.inputSm} value={editDate} onChangeText={setEditDate} />
+            <View style={styles.editGrid}>
+              <View style={styles.editCol}>
+                <Text style={styles.label}>Received (kg)</Text>
+                <TextInput
+                  style={styles.inputSm}
+                  value={editReceived}
+                  onChangeText={setEditReceived}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+              <View style={styles.editCol}>
+                <Text style={styles.label}>Used (kg)</Text>
+                <TextInput
+                  style={styles.inputSm}
+                  value={editUsed}
+                  onChangeText={setEditUsed}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+            <Text style={styles.label}>Remaining (kg)</Text>
             <TextInput
-              style={styles.inputSm}
-              value={editReceived}
-              onChangeText={setEditReceived}
-              keyboardType="decimal-pad"
-            />
-            <TextInput
-              style={styles.inputSm}
-              value={editUsed}
-              onChangeText={setEditUsed}
-              keyboardType="decimal-pad"
-            />
-            <TextInput
-              style={styles.inputSm}
+              style={[styles.inputSm, !editOverride && styles.inputDisabled]}
               value={editRemaining}
               onChangeText={setEditRemaining}
               keyboardType="decimal-pad"
               editable={editOverride}
             />
+            <Text style={styles.infoText}>
+              {editOverride
+                ? "Manual remaining is enabled; this value will be saved."
+                : "Remaining is auto-calculated from opening + received - used."}
+            </Text>
             <Text style={styles.label}>Cost ₹ (optional)</Text>
             <TextInput
               style={styles.inputSm}
@@ -299,10 +318,10 @@ export function FeedScreen() {
               </Pressable>
             </View>
             <View style={styles.recordStatsCompact}>
-              <Text style={styles.statInline}>O {(r.opening_balance_kg ?? 0).toFixed(2)}</Text>
-              <Text style={styles.statInline}>In {r.feed_received.toFixed(2)}</Text>
-              <Text style={styles.statInline}>U {r.feed_used.toFixed(2)}</Text>
-              <Text style={styles.statInline}>R {r.feed_remaining.toFixed(2)}</Text>
+              <Text style={[styles.statInline, styles.statOpen]}>O {(r.opening_balance_kg ?? 0).toFixed(2)}</Text>
+              <Text style={[styles.statInline, styles.statIn]}>In {r.feed_received.toFixed(2)}</Text>
+              <Text style={[styles.statInline, styles.statUsed]}>U {r.feed_used.toFixed(2)}</Text>
+              <Text style={[styles.statInline, styles.statRemain]}>R {r.feed_remaining.toFixed(2)}</Text>
               <Text style={[styles.statInline, styles.warnText]}>{r.remaining_auto !== false ? "Auto" : "Manual"}</Text>
               {r.purchase_cost_inr != null && r.purchase_cost_inr !== undefined ? (
                 <Text style={[styles.statInline, styles.accentText]}>Cost {fmtInr(r.purchase_cost_inr)}</Text>
@@ -380,7 +399,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 13,
   },
+  inputDisabled: { backgroundColor: "#f9fafb", color: "#9ca3af" },
+  editTitle: { fontSize: 14, fontWeight: "800", color: "#0f172a", marginBottom: 4 },
   editMeta: { fontSize: 12, color: "#71717a", marginBottom: 6 },
+  editGrid: { flexDirection: "row", gap: 8 },
+  editCol: { flex: 1 },
+  infoText: { fontSize: 11, color: "#6b7280", marginTop: -2, marginBottom: 4 },
   btn: {
     marginTop: 16,
     backgroundColor: "#047857",
@@ -426,6 +450,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  statOpen: { color: "#2563eb" },
+  statIn: { color: "#047857" },
+  statUsed: { color: "#b45309" },
+  statRemain: { color: "#0f766e" },
   editPill: {
     borderWidth: 1,
     borderColor: "#d1d5db",

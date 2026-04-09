@@ -42,6 +42,13 @@ class ExpenseCreate(BaseModel):
             )
         return s
 
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v
+
     @model_validator(mode="after")
     def miscellaneous_requires_description(self):
         if is_miscellaneous(self.category):
@@ -99,3 +106,9 @@ class ExpenseUpdate(BaseModel):
                 "category must be one of the predefined farm expense categories"
             )
         return s
+    @field_validator("date")
+    @classmethod
+    def date_cannot_be_future(cls, v: Date | None) -> Date | None:
+        if v is not None and v > Date.today():
+            raise ValueError("date cannot be in the future")
+        return v

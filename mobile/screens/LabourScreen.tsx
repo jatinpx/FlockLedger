@@ -11,6 +11,7 @@ import {
   Switch,
   Alert,
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import {
   apiFetch,
@@ -62,6 +63,7 @@ function membersAvailableForRow(row: FarmLabourRow, rows: FarmLabourRow[], membe
 
 export function LabourScreen() {
   const { farms, farmId } = useFarm();
+  const isFocused = useIsFocused();
   const current = farms.find((f) => f.id === farmId);
   const canManage = current?.my_role === "owner" || current?.my_role === "manager";
   const isWorker = current?.my_role === "worker";
@@ -154,8 +156,9 @@ export function LabourScreen() {
   }, [limit, farmId]);
 
   useEffect(() => {
+    if (!isFocused) return;
     refresh();
-  }, [refresh]);
+  }, [isFocused, refresh]);
 
   useEffect(() => {
     setPayoutDateInput(lastDayOfMonthLocal(payrollMonth));
@@ -848,6 +851,8 @@ const styles = StyleSheet.create({
   dangerLink: { color: "#b91c1c", fontWeight: "600", fontSize: 13, marginTop: 6 },
   accentText: { color: "#047857" },
   warnText: { color: "#b45309" },
+  rowMain: { fontSize: 14, fontWeight: "700", color: "#18181b", marginTop: 8 },
+  rowSub: { fontSize: 12, color: "#6b7280", marginTop: 4 },
   ledgerRow: {
     borderTopWidth: 1,
     borderTopColor: "#f4f4f5",

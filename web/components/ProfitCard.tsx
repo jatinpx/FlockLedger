@@ -19,8 +19,8 @@ export function ProfitCard(props: {
         {props.periodLabel ?? "Profit summary"}
       </h2>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        Expenses include the expense log, labour payments not yet mirrored there, and purchase cost
-        recorded on feed entries (no double counting).
+        Expenses include the expense log plus labour and feed costs that are not yet linked there
+        (no double counting).
       </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <div>
@@ -51,7 +51,7 @@ export function ProfitCard(props: {
             </span>
           </li>
           <li className="flex justify-between gap-4">
-            <span>Feed purchase cost (on feed rows)</span>
+            <span>Feed purchase cost (not in log)</span>
             <span className="shrink-0 font-medium text-zinc-800 dark:text-zinc-200">
               {fmt(br.feed_purchase_cost_on_entries)}
             </span>

@@ -563,6 +563,41 @@ def patch_labour(
     return _labour_to_out(db, row)
 
 
+@router.delete("/{labour_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_labour(
+    farm_id: int,
+    labour_id: int,
+    user: CurrentUser,
+    ip: ClientIp,
+    db: Session = Depends(get_db),
+):
+    """Deletes a farm labour record and all its associated ledger lines. Use with caution."""
+    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    row = (
+        db.query(FarmLabour)
+        .filter(FarmLabour.id == labour_id, FarmLabour.farm_id == farm_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Not found")
+    before = {"full_name": row.full_name, "is_active": row.is_active}
+    # Delete linked expenses and ledger lines (cascade will handle this via ORM)
+    record_audit(
+        db,
+        user_id=user.id,
+        farm_id=farm_id,
+        action="delete",
+        resource_type="farm_labour",
+        resource_id=labour_id,
+        before=before,
+        after=None,
+        ip=ip,
+    )
+    db.delete(row)
+    db.commit()
+    publish_farm_event(farm_id, "labour_deleted", {"id": labour_id})
+
+
 @router.post("/{labour_id}/ledger", response_model=LabourLedgerOut)
 def add_ledger_line(
     farm_id: int,

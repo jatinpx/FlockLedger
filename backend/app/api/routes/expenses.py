@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.analytics_params import list_optional_date_range
-from app.api.farm_access import require_farm_role
+from app.api.farm_access import require_farm_member, require_farm_role
 from app.api.pagination import LimitOffset, pagination_params
 from app.database import get_db
 from app.deps import ClientIp, CurrentUser
@@ -341,7 +341,7 @@ def list_expenses(
     page: LimitOffset = Depends(pagination_params),
     dr: tuple = Depends(list_optional_date_range),
 ):
-    require_farm_role(db, user.id, farm_id, *MANAGER_ROLES)
+    require_farm_member(db, user.id, farm_id)
     start_date, end_date = dr
     q = db.query(Expense).filter(Expense.farm_id == farm_id)
     if start_date is not None:
@@ -373,6 +373,11 @@ def delete_expense(
         raise HTTPException(
             status_code=400,
             detail="Delete the labour ledger payment to remove this expense (it is linked to that payment).",
+        )
+    if row.feed_inventory_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Delete or edit the feed row to remove this expense (it is linked to that feed entry).",
         )
     before = _row_dict(row)
     record_audit(
