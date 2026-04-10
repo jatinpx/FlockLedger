@@ -1,0 +1,178 @@
+from datetime import date as Date
+from datetime import datetime
+from decimal import Decimal
+
+from pydantic import BaseModel, Field, model_validator, field_validator
+
+
+class FarmLabourCreate(BaseModel):
+    full_name: str = Field(..., min_length=1, max_length=255)
+    phone: str | None = Field(None, max_length=64)
+    personnel_kind: str = Field(
+        "labour",
+        pattern="^(labour|owner_pay)$",
+        description="field staff vs owner compensation line",
+    )
+    compensation_type: str = Field(
+        "monthly",
+        pattern="^(daily|monthly|hourly|adhoc)$",
+    )
+    default_rate: float | None = Field(None, ge=0)
+    notes: str | None = None
+    hired_at: Date
+    linked_user_id: int | None = Field(
+        None,
+        description="Farm member (worker role) who may view only this labour record in the app",
+    )
+
+    @field_validator("hired_at")
+    @classmethod
+    def hired_at_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("hired_at cannot be in the future")
+        return v
+
+
+class FarmLabourPatch(BaseModel):
+    full_name: str | None = Field(None, min_length=1, max_length=255)
+    phone: str | None = Field(None, max_length=64)
+    personnel_kind: str | None = Field(None, pattern="^(labour|owner_pay)$")
+    compensation_type: str | None = Field(None, pattern="^(daily|monthly|hourly|adhoc)$")
+    default_rate: float | None = Field(None, ge=0)
+    notes: str | None = None
+    is_active: bool | None = None
+    linked_user_id: int | None = Field(
+        None,
+        description="Set to null to unlink the worker app account from this row",
+    )
+
+
+class FarmLabourOut(BaseModel):
+    id: int
+    farm_id: int
+    full_name: str
+    phone: str | None
+    personnel_kind: str
+    compensation_type: str
+    default_rate: float | None
+    notes: str | None
+    is_active: bool
+    hired_at: Date
+    balance_due: float
+    linked_user_id: int | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class LabourLedgerCreate(BaseModel):
+    line_type: str = Field(..., pattern="^(earning|payment|adjustment)$")
+    amount: Decimal
+    line_date: Date
+    description: str | None = Field(None, max_length=512)
+    sync_pl_expense: bool = Field(
+        True,
+        description="Ignored: payments always create a linked P&L expense. Kept for API compatibility.",
+    )
+
+    @field_validator("line_date")
+    @classmethod
+    def line_date_cannot_be_future(cls, v: Date) -> Date:
+        if v > Date.today():
+            raise ValueError("line_date cannot be in the future")
+        return v
+
+    @model_validator(mode="after")
+    def amount_rules(self):
+        if self.line_type in ("earning", "payment") and self.amount <= 0:
+            raise ValueError("earning and payment amounts must be positive")
+        if self.line_type == "adjustment" and self.amount == 0:
+            raise ValueError("adjustment cannot be zero")
+        return self
+
+
+class LabourLedgerOut(BaseModel):
+    id: int
+    farm_id: int
+    labour_id: int
+    line_date: Date
+    line_type: str
+    amount: float
+    description: str | None
+    created_by_user_id: int
+    created_at: datetime
+    linked_expense_id: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class LabourBalanceRow(BaseModel):
+    labour_id: int
+    full_name: str
+    personnel_kind: str
+    is_active: bool
+    balance: float
+
+
+class PayrollWorkerOut(BaseModel):
+    labour_id: int
+    full_name: str
+    linked_user_id: int | None
+    personnel_kind: str
+    is_active: bool
+    monthly_salary: float | None
+    balance_due: float
+    month: str
+    month_accrued: float
+    month_paid: float
+    month_net: float
+    payroll_accrual_posted: bool
+    payroll_accrual_amount: float | None
+
+
+PAYROLL_LABOUR_DUE_DEFINITION = (
+    "Dashboard labour_due_total (analytics) is the sum over labour rows of "
+    "max(0, running ledger balance). Month fields here are calendar-month sums on the "
+    "ledger for the selected month only."
+)
+
+
+class PayrollListOut(BaseModel):
+    month: str
+    labour_due_definition: str = Field(
+        default=PAYROLL_LABOUR_DUE_DEFINITION,
+        description=PAYROLL_LABOUR_DUE_DEFINITION,
+    )
+    workers: list[PayrollWorkerOut]
+
+
+class PayrollAccrueBody(BaseModel):
+    labour_id: int | None = None
+    user_id: int | None = None
+    month: str = Field(..., pattern=r"^\d{4}-\d{2}$")
+    amount: float | None = Field(None, ge=0, description="Defaults to labour default_rate / monthly salary")
+
+    @model_validator(mode="after")
+    def exactly_one_target(self):
+        has_labour = self.labour_id is not None
+        has_user = self.user_id is not None
+        if has_labour == has_user:
+            raise ValueError("Exactly one of labour_id or user_id is required")
+        return self
+
+
+class PayrollPayoutBody(BaseModel):
+    labour_id: int | None = None
+    user_id: int | None = None
+    month: str = Field(..., pattern=r"^\d{4}-\d{2}$")
+    amount: Decimal = Field(..., gt=0)
+    line_date: Date
+    description: str | None = Field(None, max_length=512)
+
+    @model_validator(mode="after")
+    def exactly_one_target(self):
+        has_labour = self.labour_id is not None
+        has_user = self.user_id is not None
+        if has_labour == has_user:
+            raise ValueError("Exactly one of labour_id or user_id is required")
+        return self

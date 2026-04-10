@@ -1,0 +1,25 @@
+Android emulator: pressing "a" in the Expo terminal
+====================================================
+Expo needs the Android SDK and adb. If you see:
+  "Failed to resolve the Android SDK path" or "'adb' is not recognized"
+
+1) Install Android Studio: https://developer.android.com/studio
+2) Open SDK Manager and install:
+   - Android SDK Platform (match a recent API level)
+   - Android SDK Build-Tools
+   - Android Emulator
+3) Note the SDK path (often):
+   C:\Users\<YOU>\AppData\Local\Android\Sdk
+4) Windows environment variables:
+   ANDROID_HOME = that SDK path
+   Path: add %ANDROID_HOME%\platform-tools
+5) Close and reopen your terminal (and IDE), then run Expo again.
+
+Faster options (no Android Studio)
+==================================
+- Physical device: install "Expo Go" from the store and scan the QR code from
+  `npm start` (same Wi-Fi as your PC; set EXPO_PUBLIC_API_URL to your PC IP).
+- Web preview: `npm run web` — quick UI checks; not a replacement for native.
+
+First Metro bundle can take 1–2 minutes; later reloads are much faster.
+Use `npm run start:clear` if the cache causes odd errors.
