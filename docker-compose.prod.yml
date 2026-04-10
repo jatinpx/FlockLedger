@@ -1,0 +1,22 @@
+# Production overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Changes vs. dev:
+#   - nginx listens on 0.0.0.0:80 (public)
+#   - backend port NOT exposed to host (only nginx can reach it)
+#   - redis port NOT exposed to host
+#   - restart: always on every service
+
+services:
+  redis:
+    ports: []               # remove host-binding; only internal Docker network
+    restart: always
+
+  backend:
+    ports: []               # remove 8000 from host; nginx proxies internally
+    restart: always
+
+  nginx:
+    ports:
+      - "80:80"             # public HTTP (Cloudflare or Certbot handles TLS in front)
+    restart: always
