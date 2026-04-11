@@ -32,6 +32,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "FlockLedger",
   description: "Poultry farm management dashboard",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
