@@ -59,6 +59,7 @@ export default function ProductionPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!farmId) return;
+    if (sheds.length === 0 || !shedId) return;
     try {
       await runLoaded(async () => {
         await apiFetch(`/farms/${farmId}/production/eggs`, {
@@ -206,12 +207,20 @@ export default function ProductionPage() {
             />
           </div>
         </div>
-        <button
-          type="submit"
-          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-        >
-          Save
-        </button>
+        <div>
+          <button
+            type="submit"
+            disabled={sheds.length === 0 || !shedId}
+            className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-emerald-700 dark:disabled:hover:bg-emerald-600"
+          >
+            Save
+          </button>
+          {(sheds.length === 0 || !shedId) && (
+            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+              {sheds.length === 0 ? "Add a shed in Settings to save production records." : "Select a shed to continue."}
+            </p>
+          )}
+        </div>
       </form>
 
       <div>
