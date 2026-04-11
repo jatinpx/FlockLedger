@@ -69,6 +69,7 @@ export default function SettingsPage() {
   const [shedTotal, setShedTotal] = useState(0);
   const [shedLimit, setShedLimit] = useState(DEFAULT_LIMIT);
   const [shedOffset, setShedOffset] = useState(0);
+  const [totalBirdsFarm, setTotalBirdsFarm] = useState(0);
   const [editingShed, setEditingShed] = useState<number | null>(null);
   const [editShedName, setEditShedName] = useState("");
   const [editShedBirds, setEditShedBirds] = useState("");
@@ -99,6 +100,25 @@ export default function SettingsPage() {
     });
   }, [farmId, shedLimit, shedOffset, runLoaded]);
 
+  const loadBirdsTotal = useCallback(async () => {
+    if (!farmId) return;
+    const limit = 200;
+    let offset = 0;
+    let birdsSum = 0;
+
+    while (true) {
+      const page = await apiFetch<Paginated<Shed>>(
+        withPagination(`/farms/${farmId}/sheds`, limit, offset)
+      );
+      birdsSum += page.items.reduce((sum, shed) => sum + shed.bird_count, 0);
+
+      if (page.items.length === 0 || offset + page.items.length >= page.total) break;
+      offset += page.items.length;
+    }
+
+    setTotalBirdsFarm(birdsSum);
+  }, [farmId]);
+
   const loadMembers = useCallback(async () => {
     if (!farmId || !canManage) return;
     await runLoaded(async () => {
@@ -124,10 +144,19 @@ export default function SettingsPage() {
     if (!farmId) {
       setSheds([]);
       setShedTotal(0);
+      setTotalBirdsFarm(0);
       return;
     }
     loadSheds().catch((e) => toastError(e));
   }, [farmId, loadSheds]);
+
+  useEffect(() => {
+    if (!farmId) {
+      setTotalBirdsFarm(0);
+      return;
+    }
+    loadBirdsTotal().catch((e) => toastError(e));
+  }, [farmId, loadBirdsTotal]);
 
   useEffect(() => {
     if (!farmId || !canManage) {
@@ -233,6 +262,7 @@ export default function SettingsPage() {
       setShedName("");
       setBirds("0");
       await loadSheds();
+      await loadBirdsTotal();
       toastSuccess("Shed added.");
     } catch (err) {
       toastError(err);
@@ -253,6 +283,7 @@ export default function SettingsPage() {
       });
       setEditingShed(null);
       await loadSheds();
+      await loadBirdsTotal();
       toastSuccess("Shed updated.");
     } catch (err) {
       toastError(err);
@@ -320,8 +351,6 @@ export default function SettingsPage() {
     return ["worker", "manager"];
   }
 
-  const totalBirds = sheds.reduce((sum, shed) => sum + shed.bird_count, 0);
-
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -360,7 +389,7 @@ export default function SettingsPage() {
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Birds</p>
-          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{totalBirds.toLocaleString()}</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{totalBirdsFarm.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Members</p>
