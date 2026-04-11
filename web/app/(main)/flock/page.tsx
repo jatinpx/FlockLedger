@@ -92,7 +92,11 @@ export default function FlockPage() {
   }, [farmId, loadFlockPageData]);
 
   useEffect(() => {
-    if (shedId === "" && sheds.length > 0) {
+    if (sheds.length === 0) {
+      if (shedId !== "") setShedId("");
+      return;
+    }
+    if (shedId === "" || !sheds.some((s) => s.id === shedId)) {
       setShedId(sheds[0].id);
     }
   }, [sheds, shedId]);
@@ -100,7 +104,7 @@ export default function FlockPage() {
   async function submitEvent(e: React.FormEvent) {
     e.preventDefault();
     if (!farmId || !canPostEvent) return;
-    if (shedId === "") {
+    if (shedId === "" || !sheds.some((s) => s.id === shedId)) {
       toastError(new Error("Add a shed under Settings first."));
       return;
     }
@@ -330,6 +334,7 @@ export default function FlockPage() {
           </div>
           <button
             type="submit"
+            disabled={sheds.length === 0 || shedId === ""}
             className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
           >
             Save event
