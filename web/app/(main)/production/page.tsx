@@ -46,7 +46,7 @@ export default function ProductionPage() {
       setTotal(eggRes.total);
       setShedId((prev) => prev || (shedRes.items.length ? String(shedRes.items[0].id) : ""));
     });
-  }, [farmId, limit, offset]);
+  }, [farmId, limit, offset, runLoaded]);
 
   useLayoutEffect(() => {
     setOffset(0);
@@ -114,28 +114,65 @@ export default function ProductionPage() {
     return <p className="text-zinc-500 dark:text-zinc-400">Select or create a farm in Settings.</p>;
   }
 
+  const totalEggsOnPage = rows.reduce((sum, row) => sum + row.eggs_produced, 0);
+  const totalBrokenOnPage = rows.reduce((sum, row) => sum + row.broken_eggs, 0);
+  const totalUsableOnPage = rows.reduce((sum, row) => sum + row.usable_eggs, 0);
+
   return (
     <div className="space-y-8">
+      <section className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-emerald-50/40 p-6 shadow-sm dark:border-zinc-800 dark:from-zinc-900 dark:to-emerald-950/20">
+        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Production</h1>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          Track daily egg output by shed and keep records clean with inline edits.
+        </p>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Records</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{rows.length}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Produced</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{totalEggsOnPage.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Usable</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-700 dark:text-emerald-400">{totalUsableOnPage.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Broken</p>
+          <p className="mt-2 text-2xl font-semibold text-amber-700 dark:text-amber-400">{totalBrokenOnPage.toLocaleString()}</p>
+        </div>
+      </section>
+
       <form
         onSubmit={submit}
-        className="max-w-lg space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
       >
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add egg production</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
+          <div className="sm:col-span-2">
             <label className="text-sm text-zinc-600 dark:text-zinc-400">Shed</label>
-            <select
-              className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-              value={shedId}
-              onChange={(e) => setShedId(e.target.value)}
-              required
-            >
+            <div className="mt-2 flex flex-wrap gap-2">
               {sheds.map((s) => (
-                <option key={s.id} value={s.id}>
+                <button
+                  type="button"
+                  key={s.id}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    shedId === String(s.id)
+                      ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                      : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  }`}
+                  onClick={() => setShedId(String(s.id))}
+                >
                   {s.name}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
+            {sheds.length === 0 ? (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">Add a shed in Settings first.</p>
+            ) : null}
           </div>
           <div>
             <label className="text-sm text-zinc-600 dark:text-zinc-400">Date</label>
@@ -179,7 +216,7 @@ export default function ProductionPage() {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recent records</h2>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-zinc-100 bg-zinc-50 dark:bg-zinc-900 text-xs uppercase text-zinc-500 dark:text-zinc-400">

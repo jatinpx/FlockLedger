@@ -16,6 +16,39 @@ import { toastError, toastSuccess } from "@/lib/toast";
 
 const DEFAULT_LIMIT = 10;
 
+function RoleBadge({ role }: { role: string }) {
+  const palette: Record<string, string> = {
+    owner:
+      "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300",
+    manager: "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
+    worker:
+      "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  };
+  const cls = palette[role] ?? palette.worker;
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${cls}`}
+    >
+      {role}
+    </span>
+  );
+}
+
+function SectionHeader({ label, count }: { label: string; count?: number }) {
+  return (
+    <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+        {label}
+      </h2>
+      {count !== undefined ? (
+        <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+          {count}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { farms, farmId, setFarmId, refreshFarms, invalidateMemberLists } =
     useFarm();
@@ -64,7 +97,7 @@ export default function SettingsPage() {
       setSheds(r.items);
       setShedTotal(r.total);
     });
-  }, [farmId, shedLimit, shedOffset]);
+  }, [farmId, shedLimit, shedOffset, runLoaded]);
 
   const loadMembers = useCallback(async () => {
     if (!farmId || !canManage) return;
@@ -75,7 +108,7 @@ export default function SettingsPage() {
       setMembers(r.items);
       setMemTotal(r.total);
     });
-  }, [farmId, canManage, memLimit, memOffset]);
+  }, [farmId, canManage, memLimit, memOffset, runLoaded]);
 
   useLayoutEffect(() => {
     setShedOffset(0);
@@ -287,74 +320,125 @@ export default function SettingsPage() {
     return ["worker", "manager"];
   }
 
+  const totalBirds = sheds.reduce((sum, shed) => sum + shed.bird_count, 0);
+
   return (
-    <div className="mx-auto max-w-2xl space-y-10">
-      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Create farm</h2>
-        <form onSubmit={createFarm} className="mt-4 space-y-3">
-          <input
-            placeholder="Farm name"
-            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
-            value={farmName}
-            onChange={(e) => setFarmName(e.target.value)}
-            required
-          />
-          <input
-            placeholder="Location (optional)"
-            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
-            value={farmLocation}
-            onChange={(e) => setFarmLocation(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white"
-          >
-            Create
-          </button>
-        </form>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+              {farmId ? currentFarm?.name ?? "FlockLedger" : "FlockLedger"}
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {farmId
+                ? "Farm settings & configuration"
+                : "Select or create a farm to begin"}
+            </p>
+            {farmId && currentFarm?.location ? (
+              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{currentFarm.location}</p>
+            ) : null}
+          </div>
+          {farmId && currentFarm ? <RoleBadge role={currentFarm.my_role} /> : null}
+        </div>
       </section>
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Your farms</h2>
-        <ul className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+      {!farmId ? (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+          No farm selected. Choose one from the farm picker in the header, or create a new farm below.
+        </section>
+      ) : null}
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Farms</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{farms.length}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Sheds</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{sheds.length}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Birds</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{totalBirds.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Members</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{members.length}</p>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <SectionHeader label="Create new farm" />
+        <div className="space-y-3 p-4">
+          <form onSubmit={createFarm} className="space-y-3">
+            <input
+              placeholder="Farm name"
+              className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+              value={farmName}
+              onChange={(e) => setFarmName(e.target.value)}
+              required
+            />
+            <input
+              placeholder="Location (optional)"
+              className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+              value={farmLocation}
+              onChange={(e) => setFarmLocation(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+            >
+              Create farm
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <SectionHeader label="Your farms" count={farms.length} />
+        <div className="space-y-2 p-4">
           {farms.map((f) => (
-            <li key={f.id}>
-              <button
-                type="button"
-                className={`text-left underline-offset-2 hover:underline ${
-                  f.id === farmId ? "font-semibold text-emerald-800 dark:text-emerald-400" : ""
-                }`}
-                onClick={() => setFarmId(f.id)}
-              >
-                {f.name}
-              </button>
-              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">({f.my_role})</span>
-              {f.location && (
-                <span className="text-zinc-500 dark:text-zinc-400"> — {f.location}</span>
-              )}
-            </li>
+            <button
+              key={f.id}
+              type="button"
+              className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition ${
+                f.id === farmId
+                  ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                  : "border-zinc-200 bg-white hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800/70"
+              }`}
+              onClick={() => setFarmId(f.id)}
+            >
+              <span>
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">{f.name}</span>
+                {f.location ? (
+                  <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{f.location}</span>
+                ) : null}
+              </span>
+              <RoleBadge role={f.my_role} />
+            </button>
           ))}
-          {!farms.length && <li className="text-zinc-500 dark:text-zinc-400">No farms yet.</li>}
-        </ul>
+          {!farms.length ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">No farms yet.</p>
+          ) : null}
+        </div>
       </section>
 
       {farmId && currentFarm && (
         <>
           {canManage && (
-            <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                Farm details
-              </h2>
-              <form onSubmit={saveFarmDetails} className="mt-4 space-y-3">
+            <section className="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <SectionHeader label="Farm profile" />
+              <form onSubmit={saveFarmDetails} className="space-y-3 p-4">
                 <input
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                   value={editFarmName}
                   onChange={(e) => setEditFarmName(e.target.value)}
                   required
                 />
                 <input
                   placeholder="Location"
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                   value={editFarmLocation}
                   onChange={(e) => setEditFarmLocation(e.target.value)}
                 />
@@ -369,23 +453,21 @@ export default function SettingsPage() {
           )}
 
           <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="p-6 pb-2">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Sheds</h2>
-            </div>
-            <ul className="space-y-2 px-6 text-sm text-zinc-600 dark:text-zinc-400">
+            <SectionHeader label="Sheds" count={shedTotal} />
+            <ul className="space-y-2 px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
               {sheds.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-center gap-2">
+                <li key={s.id} className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900">
                   {editingShed === s.id ? (
-                    <>
+                    <div className="flex w-full flex-wrap items-center gap-2">
                       <input
-                        className="rounded border border-zinc-200 px-2 py-1 text-sm"
+                        className="rounded border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                         value={editShedName}
                         onChange={(e) => setEditShedName(e.target.value)}
                       />
                       <input
                         type="number"
                         min={0}
-                        className="w-24 rounded border border-zinc-200 px-2 py-1 text-sm"
+                        className="w-24 rounded border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                         value={editShedBirds}
                         onChange={(e) => setEditShedBirds(e.target.value)}
                       />
@@ -403,10 +485,10 @@ export default function SettingsPage() {
                       >
                         Cancel
                       </button>
-                    </>
+                    </div>
                   ) : (
                     <>
-                      <span>
+                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
                         {s.name} — {s.bird_count} birds
                       </span>
                       {canManage && (
@@ -440,11 +522,11 @@ export default function SettingsPage() {
             {canManage && (
               <form
                 onSubmit={addShed}
-                className="grid gap-2 border-t border-zinc-100 dark:border-zinc-800 p-6 sm:grid-cols-3"
+                className="grid gap-2 border-t border-zinc-100 p-4 dark:border-zinc-800 sm:grid-cols-3"
               >
                 <input
                   placeholder="Shed name"
-                  className="rounded-md border border-zinc-200 px-3 py-2 text-sm sm:col-span-2"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 sm:col-span-2"
                   value={shedName}
                   onChange={(e) => setShedName(e.target.value)}
                   required
@@ -453,7 +535,7 @@ export default function SettingsPage() {
                   type="number"
                   min={0}
                   placeholder="Birds"
-                  className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                   value={birds}
                   onChange={(e) => setBirds(e.target.value)}
                 />
@@ -469,31 +551,31 @@ export default function SettingsPage() {
 
           {canManage && (
             <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="p-6 pb-2">
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                  Team members
-                </h2>
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              <SectionHeader label="Team members" count={memTotal} />
+              <div className="px-4 pt-3">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   Change roles here. Only owners may assign the owner role or
                   edit another owner. The last owner cannot be demoted.
                 </p>
               </div>
-              <ul className="space-y-2 px-6 text-sm">
+              <ul className="space-y-2 px-4 py-3 text-sm">
                 {members.map((m) => {
                   const opts = roleOptionsForMember(m);
                   const locked = m.role === "owner" && !isOwner;
                   return (
                     <li
                       key={m.user_id}
-                      className="flex flex-wrap items-center gap-2 border-b border-zinc-50 dark:border-zinc-800/80 py-2"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
                     >
-                      <span className="font-medium">{m.name}</span>
-                      <span className="text-zinc-500 dark:text-zinc-400">&lt;{m.email}&gt;</span>
+                      <div>
+                        <p className="font-medium text-zinc-900 dark:text-zinc-100">{m.name}</p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{m.email}</p>
+                      </div>
                       {locked ? (
                         <span className="text-emerald-800 dark:text-emerald-400">({m.role})</span>
                       ) : (
                         <select
-                          className="rounded border border-zinc-200 px-2 py-1 text-sm"
+                          className="rounded border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                           value={m.role}
                           disabled={roleSavingId === m.user_id}
                           onChange={(e) =>
@@ -525,7 +607,7 @@ export default function SettingsPage() {
                 onOffsetChange={setMemOffset}
               />
 
-              <div className="border-t border-zinc-100 dark:border-zinc-800 p-6">
+              <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
                 <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                   Invite by email
                 </h3>
@@ -536,7 +618,7 @@ export default function SettingsPage() {
                   <input
                     type="email"
                     placeholder="user@example.com"
-                    className="min-w-[200px] flex-1 rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                    className="min-w-[200px] flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                     value={memberEmail}
                     onChange={(e) => setMemberEmail(e.target.value)}
                     required
@@ -554,14 +636,14 @@ export default function SettingsPage() {
                 </h3>
                 <input
                   placeholder="Search name or email…"
-                  className="mt-2 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
+                  className="mt-2 w-full rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                   value={userQuery}
                   onChange={(e) => setUserQuery(e.target.value)}
                 />
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-xs text-zinc-500 dark:text-zinc-400">Role for invite:</span>
                   <select
-                    className="rounded-md border border-zinc-200 px-2 py-1 text-sm"
+                    className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                     value={memberRole}
                     onChange={(e) => setMemberRole(e.target.value)}
                   >
@@ -573,7 +655,7 @@ export default function SettingsPage() {
                 {searchBusy && (
                   <p className="mt-2 text-xs text-zinc-400">Searching…</p>
                 )}
-                <ul className="mt-3 max-h-48 space-y-1 overflow-auto rounded-md border border-zinc-100 p-2 text-sm">
+                <ul className="mt-3 max-h-48 space-y-1 overflow-auto rounded-md border border-zinc-100 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
                   {searchHits.map((u) => (
                     <li
                       key={u.id}
