@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type AuditLogRow, type Paginated } from "../lib/api";
+import { useAppTheme, type AppColors } from "../lib/theme";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
@@ -37,6 +38,8 @@ function resourceLabel(resourceType: string, resourceId: number | null): string 
 export function AuditScreen() {
   const { farmId, farms } = useFarm();
   const isFocused = useIsFocused();
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const current = farms.find((f) => f.id === farmId);
   const canView = current?.my_role === "owner" || current?.my_role === "manager";
 
@@ -199,76 +202,76 @@ export function AuditScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16 },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: colors.background, padding: 16 },
   listContent: { paddingBottom: 24 },
 
   stateWrap: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: colors.background,
     padding: 16,
     justifyContent: "center",
   },
-  stateTitle: { fontSize: 24, fontWeight: "800", color: "#0f172a", marginBottom: 8 },
-  stateText: { fontSize: 14, color: "#6b7280" },
+  stateTitle: { fontSize: 24, fontWeight: "800", color: colors.text, marginBottom: 8 },
+  stateText: { fontSize: 14, color: colors.textMuted },
 
   headerCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 12,
   },
-  intro: { fontSize: 13, color: "#6b7280", marginTop: 4 },
+  intro: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
   kpiRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
   kpiCard: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 10,
   },
-  kpiLabel: { fontSize: 11, color: "#6b7280", fontWeight: "700", textTransform: "uppercase" },
-  kpiValue: { marginTop: 5, fontSize: 18, fontWeight: "800", color: "#0f172a" },
+  kpiLabel: { fontSize: 11, color: colors.textMuted, fontWeight: "700", textTransform: "uppercase" },
+  kpiValue: { marginTop: 5, fontSize: 18, fontWeight: "800", color: colors.text },
 
   center: { padding: 24, alignItems: "center" },
   errorCard: {
-    backgroundColor: "#fff7ed",
+    backgroundColor: colors.dangerSoft,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#fed7aa",
+    borderColor: colors.warningBorder,
     padding: 14,
     marginBottom: 12,
   },
-  errorTitle: { fontSize: 13, fontWeight: "700", color: "#9a3412" },
+  errorTitle: { fontSize: 13, fontWeight: "700", color: colors.dangerText },
   retryBtn: {
     marginTop: 10,
     alignSelf: "flex-start",
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  retryBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  retryBtnText: { color: colors.inverseText, fontSize: 12, fontWeight: "700" },
 
   emptyCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
   },
-  emptyTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  emptyText: { marginTop: 3, fontSize: 12, color: "#6b7280" },
+  emptyTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
+  emptyText: { marginTop: 3, fontSize: 12, color: colors.textMuted },
 
-  title: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
+  title: { fontSize: 20, fontWeight: "800", color: colors.text },
   row: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
@@ -288,8 +291,8 @@ const styles = StyleSheet.create({
   },
   actionPillText: { fontSize: 10, fontWeight: "800" },
 
-  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
-  resourceLine: { fontSize: 14, color: "#0f172a", fontWeight: "700", marginBottom: 5 },
+  recordDate: { fontSize: 11, color: colors.textMuted, fontWeight: "600", marginTop: 1 },
+  resourceLine: { fontSize: 14, color: colors.text, fontWeight: "700", marginBottom: 5 },
   recordStatsCompact: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -297,18 +300,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 2,
   },
-  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  statInline: { fontSize: 12, fontWeight: "700", color: colors.inputText },
   detailBox: {
     marginTop: 6,
-    backgroundColor: "#f9fafb",
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 8,
   },
   detail: {
     fontSize: 11,
-    color: "#52525b",
+    color: colors.textSoft,
     fontFamily: "monospace",
   },
 });
