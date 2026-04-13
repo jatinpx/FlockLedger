@@ -23,6 +23,7 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -124,17 +125,27 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
         onChangeText={setEmail}
         editable={!busy}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={colors.placeholder}
-        secureTextEntry
-        keyboardAppearance={colors.isDark ? "dark" : "light"}
-        selectionColor={colors.accent}
-        value={password}
-        onChangeText={setPassword}
-        editable={!busy}
-      />
+      <View style={styles.passwordRow}>
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Password"
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry={!showPassword}
+          keyboardAppearance={colors.isDark ? "dark" : "light"}
+          selectionColor={colors.accent}
+          value={password}
+          onChangeText={setPassword}
+          editable={!busy}
+        />
+        <Pressable
+          onPress={() => setShowPassword((prev) => !prev)}
+          style={styles.passwordToggle}
+          hitSlop={8}
+          disabled={busy}
+        >
+          <Text style={styles.passwordToggleText}>{showPassword ? "Hide" : "Show"}</Text>
+        </Pressable>
+      </View>
       {err ? <Text style={styles.err}>{err}</Text> : null}
       <Pressable
         style={[styles.btn, busy && styles.btnDisabled]}
@@ -189,6 +200,28 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     marginBottom: 12,
     backgroundColor: colors.inputBg,
     color: colors.inputText,
+  },
+  passwordRow: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 8,
+    marginBottom: 12,
+    backgroundColor: colors.inputBg,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 12,
+    color: colors.inputText,
+  },
+  passwordToggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  passwordToggleText: {
+    color: colors.accent,
+    fontWeight: "600",
   },
   err: { color: colors.danger, marginBottom: 8 },
   btn: {
