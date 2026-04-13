@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type EggProduction, type Paginated, type Shed } from "../lib/api";
+import { useAppTheme, type AppColors } from "../lib/theme";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
@@ -20,6 +21,8 @@ const DEFAULT_LIMIT = 50;
 export function ProductionScreen() {
   const { farmId } = useFarm();
   const isFocused = useIsFocused();
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [sheds, setSheds] = useState<Shed[]>([]);
   const [rows, setRows] = useState<EggProduction[]>([]);
   const [total, setTotal] = useState(0);
@@ -198,7 +201,7 @@ export function ProductionScreen() {
           onPress={submit}
           disabled={saving || !canSubmit || sheds.length === 0}
         >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Save production</Text>}
+          {saving ? <ActivityIndicator color={colors.inverseText} /> : <Text style={styles.primaryBtnText}>Save production</Text>}
         </Pressable>
       </View>
 
@@ -208,7 +211,7 @@ export function ProductionScreen() {
       </View>
 
       {loading && !rows.length ? (
-        <ActivityIndicator style={{ marginVertical: 16 }} color="#047857" />
+        <ActivityIndicator style={{ marginVertical: 16 }} color={colors.accent} />
       ) : null}
 
       {rows.map((r) =>
@@ -294,57 +297,57 @@ export function ProductionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#f3f4f6" },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 28 },
-  muted: { padding: 16, color: "#6b7280", fontSize: 14 },
+  muted: { padding: 16, color: colors.textMuted, fontSize: 14 },
 
   headerCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 12,
   },
-  screenTitle: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
-  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
+  screenTitle: { fontSize: 24, fontWeight: "800", color: colors.text },
+  screenSub: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
 
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
   kpiCard: {
     width: "48%",
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
   },
-  kpiLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", fontWeight: "700" },
-  kpiValue: { fontSize: 24, fontWeight: "800", color: "#0f172a", marginTop: 6 },
-  kpiValueAccent: { fontSize: 24, fontWeight: "800", color: "#047857", marginTop: 6 },
-  kpiValueWarn: { fontSize: 24, fontWeight: "800", color: "#b45309", marginTop: 6 },
+  kpiLabel: { fontSize: 11, color: colors.textMuted, textTransform: "uppercase", fontWeight: "700" },
+  kpiValue: { fontSize: 24, fontWeight: "800", color: colors.text, marginTop: 6 },
+  kpiValueAccent: { fontSize: 24, fontWeight: "800", color: colors.accent, marginTop: 6 },
+  kpiValueWarn: { fontSize: 24, fontWeight: "800", color: colors.warning, marginTop: 6 },
 
   sectionCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
   },
   sectionHeader: { marginBottom: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  sectionSub: { fontSize: 12, color: "#6b7280", marginTop: 3 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
+  sectionSub: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
 
-  label: { fontSize: 12, color: "#4b5563", fontWeight: "600", marginBottom: 4 },
+  label: { fontSize: 12, color: colors.textSoft, fontWeight: "600", marginBottom: 4 },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: "#ffffff",
-    color: "#111827",
+    backgroundColor: colors.inputBg,
+    color: colors.inputText,
   },
   inputGrid: { flexDirection: "row", gap: 10, marginTop: 6 },
   inputCol: { flex: 1, gap: 4 },
@@ -355,17 +358,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     marginRight: 8,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
   },
-  chipOn: { backgroundColor: "#047857", borderColor: "#047857" },
-  chipText: { fontSize: 12, fontWeight: "700", color: "#374151" },
-  chipTextOn: { color: "#fff" },
+  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { fontSize: 12, fontWeight: "700", color: colors.textSoft },
+  chipTextOn: { color: colors.inverseText },
 
   primaryBtn: {
     marginTop: 16,
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
@@ -374,29 +377,29 @@ const styles = StyleSheet.create({
   },
   primaryBtnSmall: {
     flex: 1,
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
   },
   btnDis: { opacity: 0.7 },
-  primaryBtnText: { color: "#fff", fontWeight: "700" },
+  primaryBtnText: { color: colors.inverseText, fontWeight: "700" },
   ghostBtn: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#ffffff",
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     alignItems: "center",
   },
-  ghostBtnText: { color: "#374151", fontWeight: "600" },
+  ghostBtnText: { color: colors.textSoft, fontWeight: "600" },
 
   recordRowCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
@@ -408,8 +411,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   recordRowHeadLeft: { flex: 1, paddingRight: 8 },
-  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
+  recordDate: { fontSize: 11, color: colors.textMuted, fontWeight: "600", marginTop: 1 },
 
   recordStatsCompact: {
     flexDirection: "row",
@@ -417,31 +420,31 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: "center",
   },
-  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  statInline: { fontSize: 12, fontWeight: "700", color: colors.inputText },
 
   inlineActionCompact: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#ffffff",
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
   },
-  inlineActionText: { color: "#047857", fontWeight: "700", fontSize: 13 },
+  inlineActionText: { color: colors.accent, fontWeight: "700", fontSize: 13 },
 
   editCard: {
-    backgroundColor: "#fffbeb",
+    backgroundColor: colors.warningSoft,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#fde68a",
+    borderColor: colors.warningBorder,
     padding: 12,
     marginBottom: 10,
     gap: 8,
   },
-  editTitle: { fontSize: 14, fontWeight: "700", color: "#92400e" },
+  editTitle: { fontSize: 14, fontWeight: "700", color: colors.warningStrong },
   actionRow: { flexDirection: "row", gap: 10, marginTop: 4 },
 
-  helpWarn: { marginTop: -2, marginBottom: 6, fontSize: 12, color: "#b45309" },
-  accentText: { color: "#047857" },
-  warnText: { color: "#b45309" },
+  helpWarn: { marginTop: -2, marginBottom: 6, fontSize: 12, color: colors.warning },
+  accentText: { color: colors.accent },
+  warnText: { color: colors.warning },
 });
