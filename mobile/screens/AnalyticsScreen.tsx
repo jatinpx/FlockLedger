@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import { useIsFocused } from "@react-navigation/native";
 import { useFarm } from "../lib/farm-context";
 import { apiFetch, type Paginated, type ProfitSummaryOut } from "../lib/api";
+import { useAppTheme, type AppColors } from "../lib/theme";
 import { withPagination } from "../lib/pagination";
 import {
   buildSeriesQuery,
@@ -39,6 +40,8 @@ const fmtInr = (n: number) =>
 export function AnalyticsScreen() {
   const { farmId } = useFarm();
   const isFocused = useIsFocused();
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [periodMode, setPeriodMode] = useState<(typeof PERIOD_MODES)[number]>("days");
   const [periodDays, setPeriodDays] = useState<number>(30);
   const [startDate, setStartDate] = useState<string>("");
@@ -375,92 +378,93 @@ export function AnalyticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#f3f4f6" },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 32 },
   center: { padding: 24, alignItems: "center" },
-  muted: { color: "#71717a", marginTop: 8 },
+  muted: { color: colors.textMuted, marginTop: 8 },
 
   headerCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 12,
   },
-  screenTitle: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
-  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
+  screenTitle: { fontSize: 24, fontWeight: "800", color: colors.text },
+  screenSub: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
 
   sectionCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a", marginBottom: 6 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: 6 },
 
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
   kpiCard: {
     width: "48%",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     padding: 12,
   },
   kpiCardWide: {
     width: "100%",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     padding: 12,
   },
-  kpiLabel: { fontSize: 11, color: "#6b7280", textTransform: "uppercase", fontWeight: "700" },
-  kpiValue: { fontSize: 18, fontWeight: "800", color: "#0f172a", marginTop: 4 },
-  kpiValueAccent: { fontSize: 20, fontWeight: "800", color: "#047857", marginTop: 4 },
+  kpiLabel: { fontSize: 11, color: colors.textMuted, textTransform: "uppercase", fontWeight: "700" },
+  kpiValue: { fontSize: 18, fontWeight: "800", color: colors.text, marginTop: 4 },
+  kpiValueAccent: { fontSize: 20, fontWeight: "800", color: colors.accent, marginTop: 4 },
 
-  hint: { fontSize: 12, color: "#71717a", marginTop: 8, marginBottom: 6 },
+  hint: { fontSize: 12, color: colors.textMuted, marginTop: 8, marginBottom: 6 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    backgroundColor: "#fff",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   chipSm: {
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    backgroundColor: "#fff",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  chipOn: { backgroundColor: "#ecfdf5", borderColor: "#6ee7b7" },
-  chipText: { fontSize: 13, fontWeight: "600", color: "#3f3f46" },
-  chipTextSm: { fontSize: 11, fontWeight: "600", color: "#3f3f46" },
-  chipTextOn: { color: "#065f46" },
+  chipOn: { backgroundColor: colors.accentSoft, borderColor: colors.accentBorder },
+  chipText: { fontSize: 13, fontWeight: "600", color: colors.textSoft },
+  chipTextSm: { fontSize: 11, fontWeight: "600", color: colors.textSoft },
+  chipTextOn: { color: colors.accentText },
   input: {
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: colors.border,
     borderRadius: 8,
-    backgroundColor: "#fff",
+    backgroundColor: colors.inputBg,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
+    color: colors.inputText,
   },
-  h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginTop: 16, marginBottom: 10 },
-  sub: { fontSize: 13, color: "#71717a", marginTop: 8 },
+  h2: { fontSize: 17, fontWeight: "700", color: colors.textStrong, marginTop: 16, marginBottom: 10 },
+  sub: { fontSize: 13, color: colors.textMuted, marginTop: 8 },
   compactRow: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
@@ -472,33 +476,33 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   recordHeadLeft: { flex: 1, paddingRight: 8 },
-  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
+  recordDate: { fontSize: 11, color: colors.textMuted, fontWeight: "600", marginTop: 1 },
   recordStatsCompact: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
     alignItems: "center",
   },
-  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
-  accentText: { color: "#047857" },
-  warnText: { color: "#b45309" },
+  statInline: { fontSize: 12, fontWeight: "700", color: colors.inputText },
+  accentText: { color: colors.accent },
+  warnText: { color: colors.warning },
   json: {
     fontFamily: "monospace",
     fontSize: 11,
-    color: "#52525b",
-    backgroundColor: "#fff",
+    color: colors.textSoft,
+    backgroundColor: colors.surface,
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: colors.border,
   },
   retry: {
     marginTop: 16,
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
   },
-  retryText: { color: "#fff", fontWeight: "600" },
+  retryText: { color: colors.inverseText, fontWeight: "600" },
 });
