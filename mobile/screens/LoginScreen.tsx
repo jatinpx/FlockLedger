@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,11 +11,14 @@ import {
 } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { apiFetch, setToken } from "../lib/api";
+import { useAppTheme, type AppColors } from "../lib/theme";
 import type { RootStackParamList } from "../types";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: { navigation: Nav }) {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -104,6 +107,7 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
         <TextInput
           style={styles.input}
           placeholder="Full name"
+          placeholderTextColor={colors.placeholder}
           value={name}
           onChangeText={setName}
           editable={!busy}
@@ -112,8 +116,10 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor={colors.placeholder}
         autoCapitalize="none"
         keyboardType="email-address"
+        keyboardAppearance={colors.isDark ? "dark" : "light"}
         value={email}
         onChangeText={setEmail}
         editable={!busy}
@@ -121,7 +127,10 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor={colors.placeholder}
         secureTextEntry
+        keyboardAppearance={colors.isDark ? "dark" : "light"}
+        selectionColor={colors.accent}
         value={password}
         onChangeText={setPassword}
         editable={!busy}
@@ -142,26 +151,26 @@ export function LoginScreen({ navigation }: { navigation: Nav }) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "#f3f4f6" },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  wrap: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: colors.background },
   headerCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 12,
   },
-  title: { fontSize: 30, fontWeight: "800", color: "#065f46" },
-  sub: { marginTop: 4, color: "#6b7280" },
+  title: { fontSize: 30, fontWeight: "800", color: colors.accentStrong },
+  sub: { marginTop: 4, color: colors.textMuted },
   modeRow: {
     flexDirection: "row",
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 8,
     overflow: "hidden",
     marginBottom: 12,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   modeBtn: {
     flex: 1,
@@ -169,20 +178,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 10,
   },
-  modeBtnOn: { backgroundColor: "#ecfdf5" },
-  modeBtnText: { color: "#3f3f46", fontWeight: "600" },
-  modeBtnTextOn: { color: "#065f46" },
+  modeBtnOn: { backgroundColor: colors.accentSoft },
+  modeBtnText: { color: colors.textSoft, fontWeight: "600" },
+  modeBtnTextOn: { color: colors.accentText },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
-    backgroundColor: "#fff",
+    backgroundColor: colors.inputBg,
+    color: colors.inputText,
   },
-  err: { color: "#b91c1c", marginBottom: 8 },
+  err: { color: colors.danger, marginBottom: 8 },
   btn: {
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     padding: 14,
     borderRadius: 8,
     alignItems: "center",
@@ -190,5 +200,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnDisabled: { opacity: 0.85 },
-  btnText: { color: "#fff", fontWeight: "600" },
+  btnText: { color: colors.inverseText, fontWeight: "600" },
 });
