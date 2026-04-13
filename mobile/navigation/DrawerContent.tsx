@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   DrawerContentScrollView,
   DrawerContentComponentProps,
@@ -5,6 +6,7 @@ import {
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useFarm } from "../lib/farm-context";
 import { setToken } from "../lib/api";
+import { useAppTheme, type AppColors } from "../lib/theme";
 
 const MAIN_LINKS: { route: string; label: string }[] = [
   { route: "Dashboard", label: "Dashboard" },
@@ -25,6 +27,8 @@ const WORKER_LINKS: { route: string; label: string }[] = [
 /** Same order and labels as web `AppShell` sidebar. */
 export function AppDrawerContent(props: DrawerContentComponentProps) {
   const { navigation, state } = props;
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { farms, farmId, loading } = useFarm();
   const current = farms.find((f) => f.id === farmId);
   const isWorker = !loading && current?.my_role === "worker";
@@ -76,17 +80,17 @@ export function AppDrawerContent(props: DrawerContentComponentProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   drawer: { flex: 1 },
-  scroll: { flexGrow: 1 },
+  scroll: { flexGrow: 1, backgroundColor: colors.surface },
   brand: {
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f4f4f5",
+    borderBottomColor: colors.borderSoft,
   },
-  brandTitle: { fontSize: 18, fontWeight: "700", color: "#065f46" },
-  brandSub: { fontSize: 11, color: "#71717a", marginTop: 4 },
+  brandTitle: { fontSize: 18, fontWeight: "700", color: colors.accentStrong },
+  brandSub: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
   nav: { padding: 8, flex: 1 },
   item: {
     borderRadius: 8,
@@ -94,20 +98,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 2,
   },
-  itemActive: { backgroundColor: "#ecfdf5" },
-  itemText: { fontSize: 14, fontWeight: "600", color: "#52525b" },
-  itemTextActive: { color: "#065f46" },
+  itemActive: { backgroundColor: colors.accentSoft },
+  itemText: { fontSize: 14, fontWeight: "600", color: colors.textSoft },
+  itemTextActive: { color: colors.accentText },
   footer: {
     borderTopWidth: 1,
-    borderTopColor: "#f4f4f5",
+    borderTopColor: colors.borderSoft,
     padding: 12,
   },
   logout: {
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: colors.border,
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: "center",
+    backgroundColor: colors.surfaceAlt,
   },
-  logoutText: { fontSize: 14, color: "#3f3f46", fontWeight: "600" },
+  logoutText: { fontSize: 14, color: colors.textSoft, fontWeight: "600" },
 });
