@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { PAGE_SIZE_OPTIONS, totalPages } from "../lib/pagination";
+import { useAppTheme, type AppColors } from "../lib/theme";
 
 type Props = {
   total: number;
@@ -16,6 +18,8 @@ export function PaginatedControls({
   onLimitChange,
   onOffsetChange,
 }: Props) {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pages = totalPages(total, limit);
   const currentPage = Math.floor(offset / limit) + 1;
   const from = total === 0 ? 0 : offset + 1;
@@ -58,40 +62,40 @@ export function PaginatedControls({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   wrap: {
     paddingVertical: 12,
     paddingHorizontal: 4,
     borderTopWidth: 1,
-    borderTopColor: "#e4e4e7",
-    backgroundColor: "#fafafa",
+    borderTopColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
   },
-  meta: { fontSize: 12, color: "#52525b", marginBottom: 8 },
-  label: { fontSize: 11, color: "#71717a", marginBottom: 6, textTransform: "uppercase" },
+  meta: { fontSize: 12, color: colors.textSoft, marginBottom: 8 },
+  label: { fontSize: 11, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase" },
   chips: { flexGrow: 0, marginBottom: 10 },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#d4d4d8",
+    borderColor: colors.borderStrong,
     marginRight: 8,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
-  chipOn: { backgroundColor: "#047857", borderColor: "#047857" },
-  chipText: { fontSize: 13, color: "#3f3f46", fontWeight: "600" },
-  chipTextOn: { color: "#fff" },
+  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { fontSize: 13, color: colors.textSoft, fontWeight: "600" },
+  chipTextOn: { color: colors.inverseText },
   nav: { flexDirection: "row" },
   navBtn: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: colors.border,
     alignItems: "center",
   },
   navBtnLeft: { marginRight: 10 },
   btnDisabled: { opacity: 0.4 },
-  btnText: { fontSize: 14, fontWeight: "600", color: "#18181b" },
+  btnText: { fontSize: 14, fontWeight: "600", color: colors.textStrong },
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {
   type DashboardSummary,
   type ProfitSummaryOut,
 } from "../lib/api";
+import { useAppTheme, type AppColors } from "../lib/theme";
 import { buildSummaryQuery, type SummaryPeriodInput } from "../lib/reporting-query";
 
 const PERIOD_OPTIONS = [7, 30, 90, 180, 365] as const;
@@ -32,6 +33,8 @@ function periodModeLabel(mode: (typeof PERIOD_MODES)[number]): string {
 export function DashboardScreen() {
   const { farmId } = useFarm();
   const isFocused = useIsFocused();
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [periodMode, setPeriodMode] = useState<(typeof PERIOD_MODES)[number]>("days");
   const [periodDays, setPeriodDays] = useState<number>(30);
   const [startDate, setStartDate] = useState<string>("");
@@ -134,7 +137,7 @@ export function DashboardScreen() {
   if (!data && loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#047857" />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.muted}>Loading dashboard…</Text>
       </View>
     );
@@ -356,47 +359,47 @@ export function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#f3f4f6" },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 28 },
   center: { padding: 48, alignItems: "center" },
-  muted: { padding: 16, color: "#6b7280", fontSize: 14 },
+  muted: { padding: 16, color: colors.textMuted, fontSize: 14 },
   errorCard: {
     margin: 16,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
   },
 
   headerCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 12,
     gap: 10,
   },
-  screenTitle: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
-  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
+  screenTitle: { fontSize: 24, fontWeight: "800", color: colors.text },
+  screenSub: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
   badgeSoft: {
     alignSelf: "flex-start",
     borderRadius: 999,
-    backgroundColor: "#ecfeff",
+    backgroundColor: colors.infoSoft,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  badgeSoftText: { fontSize: 12, color: "#0f766e", fontWeight: "600" },
+  badgeSoftText: { fontSize: 12, color: colors.infoText, fontWeight: "600" },
 
   liveCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#ecfdf5",
+    backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: "#86efac",
+    borderColor: colors.accentBorder,
     borderRadius: 12,
     padding: 10,
     marginBottom: 12,
@@ -404,25 +407,25 @@ const styles = StyleSheet.create({
   livePill: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#065f46",
-    backgroundColor: "#d1fae5",
+    color: colors.accentText,
+    backgroundColor: colors.successSoft,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
     overflow: "hidden",
   },
-  liveText: { flex: 1, fontSize: 12, color: "#065f46", fontWeight: "600" },
+  liveText: { flex: 1, fontSize: 12, color: colors.accentText, fontWeight: "600" },
 
   sectionCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  sectionSub: { fontSize: 12, color: "#6b7280", marginTop: 3, marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
+  sectionSub: { fontSize: 12, color: colors.textMuted, marginTop: 3, marginBottom: 10 },
 
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   chip: {
@@ -430,50 +433,50 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#ffffff",
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
   },
-  chipOn: { backgroundColor: "#047857", borderColor: "#047857" },
-  chipText: { fontSize: 12, color: "#374151", fontWeight: "700" },
-  chipTextOn: { color: "#ffffff" },
+  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { fontSize: 12, color: colors.textSoft, fontWeight: "700" },
+  chipTextOn: { color: colors.inverseText },
 
-  inputLabel: { fontSize: 12, color: "#4b5563", fontWeight: "600", marginBottom: 4 },
+  inputLabel: { fontSize: 12, color: colors.textSoft, fontWeight: "600", marginBottom: 4 },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.inputBg,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 10,
-    color: "#111827",
+    color: colors.inputText,
   },
   ghostBtn: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 10,
-    backgroundColor: "#f9fafb",
+    backgroundColor: colors.surfaceMuted,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  ghostBtnText: { fontSize: 12, color: "#374151", fontWeight: "600" },
+  ghostBtnText: { fontSize: 12, color: colors.textSoft, fontWeight: "600" },
 
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
   kpiGridCompact: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 },
   kpiCard: {
     width: "48%",
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
   },
   kpiCardWide: {
     width: "100%",
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
   },
   kpiMiniCard: {
@@ -481,20 +484,20 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 12,
-    backgroundColor: "#f9fafb",
+    backgroundColor: colors.surfaceMuted,
   },
   kpiLabel: {
     fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: 0.4,
-    color: "#6b7280",
+    color: colors.textMuted,
     fontWeight: "700",
   },
-  kpiValue: { fontSize: 24, color: "#0f172a", fontWeight: "800", marginTop: 8 },
-  kpiValueAccent: { fontSize: 24, color: "#047857", fontWeight: "800", marginTop: 8 },
-  kpiMiniValue: { fontSize: 16, color: "#111827", fontWeight: "700", marginTop: 6 },
+  kpiValue: { fontSize: 24, color: colors.text, fontWeight: "800", marginTop: 8 },
+  kpiValueAccent: { fontSize: 24, color: colors.accent, fontWeight: "800", marginTop: 8 },
+  kpiMiniValue: { fontSize: 16, color: colors.inputText, fontWeight: "700", marginTop: 6 },
 
   splitRow: {
     flexDirection: "row",
@@ -502,7 +505,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: colors.borderSoft,
   },
   splitRowLast: {
     flexDirection: "row",
@@ -510,34 +513,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 10,
   },
-  splitKey: { fontSize: 13, color: "#4b5563" },
-  splitKeyStrong: { fontSize: 13, color: "#111827", fontWeight: "700" },
-  splitVal: { fontSize: 13, color: "#111827", fontWeight: "600" },
-  splitValStrong: { fontSize: 14, color: "#047857", fontWeight: "800" },
+  splitKey: { fontSize: 13, color: colors.textSoft },
+  splitKeyStrong: { fontSize: 13, color: colors.inputText, fontWeight: "700" },
+  splitVal: { fontSize: 13, color: colors.inputText, fontWeight: "600" },
+  splitValStrong: { fontSize: 14, color: colors.accent, fontWeight: "800" },
 
-  divider: { height: 1, backgroundColor: "#f3f4f6", marginVertical: 10 },
+  divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 10 },
   costCard: {
     marginTop: 12,
     borderRadius: 10,
-    backgroundColor: "#ecfdf5",
+    backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: "#a7f3d0",
+    borderColor: colors.accentBorder,
     padding: 10,
   },
-  costLabel: { fontSize: 12, color: "#065f46", fontWeight: "700" },
-  costValue: { fontSize: 16, color: "#047857", fontWeight: "800", marginTop: 4 },
+  costLabel: { fontSize: 12, color: colors.accentText, fontWeight: "700" },
+  costValue: { fontSize: 16, color: colors.accent, fontWeight: "800", marginTop: 4 },
 
-  warnText: { color: "#b45309" },
-  posText: { color: "#047857" },
-  negText: { color: "#b91c1c" },
+  warnText: { color: colors.warning },
+  posText: { color: colors.accent },
+  negText: { color: colors.danger },
 
   retry: {
     marginTop: 12,
     alignSelf: "center",
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,
   },
-  retryText: { color: "#fff", fontWeight: "700" },
+  retryText: { color: colors.inverseText, fontWeight: "700" },
 });

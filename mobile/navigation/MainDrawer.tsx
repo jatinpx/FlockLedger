@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { FarmHeaderButton } from "../components/FarmHeaderButton";
 import { useFarm } from "../lib/farm-context";
+import { useAppTheme } from "../lib/theme";
 import { AppDrawerContent } from "./DrawerContent";
 import { DashboardScreen } from "../screens/DashboardScreen";
 import { ProductionScreen } from "../screens/ProductionScreen";
@@ -32,20 +34,29 @@ const headerRight = () => <FarmHeaderButton />;
 
 function MainDrawerInner() {
   const { farms, farmId, loading } = useFarm();
+  const colors = useAppTheme();
   const current = farms.find((f) => f.id === farmId);
   const workerOnly = !loading && current?.my_role === "worker";
+  const screenOptions = useMemo(
+    () => ({
+      headerShown: true,
+      headerTitle: "FlockLedger",
+      headerRight,
+      drawerType: "front" as const,
+      drawerStyle: { width: 280, backgroundColor: colors.surface },
+      headerStyle: { backgroundColor: colors.surface },
+      headerTintColor: colors.text,
+      headerTitleStyle: { color: colors.text, fontWeight: "700" as const },
+      sceneStyle: { backgroundColor: colors.background },
+    }),
+    [colors]
+  );
 
   return (
     <Drawer.Navigator
       drawerContent={(props) => <AppDrawerContent {...props} />}
       initialRouteName={workerOnly ? "Labour" : "Dashboard"}
-      screenOptions={{
-        headerShown: true,
-        headerTitle: "FlockLedger",
-        headerRight,
-        drawerType: "front",
-        drawerStyle: { width: 280 },
-      }}
+      screenOptions={screenOptions}
     >
       {!workerOnly ? (
         <Drawer.Screen

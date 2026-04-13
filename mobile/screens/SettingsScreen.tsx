@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
   type UserSearchRow,
 } from "../lib/api";
 import { useFarm } from "../lib/farm-context";
+import { useAppTheme, type AppColors } from "../lib/theme";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 import type { DrawerParamList } from "../navigation/MainDrawer";
@@ -38,12 +39,14 @@ function roleOptionsForMember(m: FarmMemberRow, isOwner: boolean): string[] {
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const colors: Record<string, { bg: string; fg: string }> = {
-    owner: { bg: "#dcfce7", fg: "#166534" },
-    manager: { bg: "#dbeafe", fg: "#1d4ed8" },
-    worker: { bg: "#f3f4f6", fg: "#374151" },
+  const themeColors = useAppTheme();
+  const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+  const roleColors: Record<string, { bg: string; fg: string }> = {
+    owner: { bg: themeColors.accentSoft, fg: themeColors.accentText },
+    manager: { bg: themeColors.infoSoft, fg: themeColors.info },
+    worker: { bg: themeColors.surfaceMuted, fg: themeColors.textSoft },
   };
-  const c = colors[role] ?? colors.worker;
+  const c = roleColors[role] ?? roleColors.worker;
   return (
     <View style={[styles.roleBadge, { backgroundColor: c.bg }]}>
       <Text style={[styles.roleBadgeText, { color: c.fg }]}>{role}</Text>
@@ -52,6 +55,8 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 function SectionHeader({ label, count }: { label: string; count?: number }) {
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionLabel}>{label}</Text>
@@ -66,6 +71,8 @@ function SectionHeader({ label, count }: { label: string; count?: number }) {
 
 export function SettingsScreen({ navigation }: Props) {
   const { farmId, farms, setFarmId, refreshFarms, invalidateMemberLists } = useFarm();
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const currentFarm = farms.find((f) => f.id === farmId);
   const farmName = currentFarm?.name ?? "Farm";
   const myRole = currentFarm?.my_role ?? "worker";
@@ -818,24 +825,24 @@ export function SettingsScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#f3f4f6" },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: colors.background },
   wrapContent: { padding: 16 },
 
   // Header
   headerCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 14,
   },
   headerTop: { flexDirection: "row", alignItems: "flex-start" },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: "#0f172a" },
-  headerSub: { fontSize: 13, color: "#6b7280", marginTop: 2 },
+  headerTitle: { fontSize: 20, fontWeight: "800", color: colors.text },
+  headerSub: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   headerMetaRow: { flexDirection: "row", marginTop: 10 },
-  headerMeta: { fontSize: 12, color: "#9ca3af", fontWeight: "500" },
+  headerMeta: { fontSize: 12, color: colors.textFaint, fontWeight: "500" },
 
   // Role badge
   roleBadge: {
@@ -849,22 +856,22 @@ const styles = StyleSheet.create({
 
   // Hint card
   hintCard: {
-    backgroundColor: "#fffbeb",
+    backgroundColor: colors.warningSoft,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#fde68a",
+    borderColor: colors.warningBorder,
     padding: 14,
     marginBottom: 14,
   },
-  hintTitle: { fontSize: 14, fontWeight: "700", color: "#92400e", marginBottom: 4 },
-  hintText: { fontSize: 13, color: "#b45309", lineHeight: 19 },
+  hintTitle: { fontSize: 14, fontWeight: "700", color: colors.warningStrong, marginBottom: 4 },
+  hintText: { fontSize: 13, color: colors.warning, lineHeight: 19 },
 
   // Section card
   sectionCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     marginBottom: 12,
     overflow: "hidden",
   },
@@ -874,75 +881,75 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-    backgroundColor: "#fafafa",
+    borderBottomColor: colors.borderSoft,
+    backgroundColor: colors.surfaceAlt,
   },
   sectionLabel: {
     flex: 1,
     fontSize: 12,
     fontWeight: "700",
-    color: "#374151",
+    color: colors.textSoft,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   countPill: {
-    backgroundColor: "#e5e7eb",
+    backgroundColor: colors.border,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  countPillText: { fontSize: 12, fontWeight: "700", color: "#6b7280" },
+  countPillText: { fontSize: 12, fontWeight: "700", color: colors.textMuted },
   sectionBody: { padding: 14 },
 
   // Labels & inputs
-  label: { fontSize: 12, fontWeight: "600", color: "#374151", marginBottom: 5 },
-  labelOptional: { fontSize: 12, fontWeight: "400", color: "#9ca3af" },
+  label: { fontSize: 12, fontWeight: "600", color: colors.textSoft, marginBottom: 5 },
+  labelOptional: { fontSize: 12, fontWeight: "400", color: colors.textFaint },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 9,
     paddingHorizontal: 12,
     paddingVertical: 11,
     fontSize: 14,
-    color: "#111827",
-    backgroundColor: "#fafafa",
+    color: colors.inputText,
+    backgroundColor: colors.inputAltBg,
     marginBottom: 12,
   },
 
   // Buttons
   btnPrimary: {
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
     minHeight: 44,
   },
-  btnPrimaryText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  btnPrimaryText: { color: colors.inverseText, fontWeight: "700", fontSize: 14 },
   btnSecondary: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 11,
     paddingHorizontal: 16,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
-  btnSecondaryText: { color: "#374151", fontWeight: "600", fontSize: 14 },
+  btnSecondaryText: { color: colors.textSoft, fontWeight: "600", fontSize: 14 },
   btnDisabled: { opacity: 0.55 },
   btnFlex: { flex: 1 },
 
   addRowBtn: {
     borderWidth: 1,
-    borderColor: "#d1fae5",
+    borderColor: colors.accentBorder,
     borderRadius: 9,
-    backgroundColor: "#f0fdf4",
+    backgroundColor: colors.accentSoftAlt,
     alignItems: "center",
     paddingVertical: 12,
     marginTop: 6,
   },
-  addRowBtnText: { color: "#047857", fontWeight: "700", fontSize: 14 },
+  addRowBtnText: { color: colors.accent, fontWeight: "700", fontSize: 14 },
 
   // Item rows (sheds)
   itemRow: {
@@ -950,22 +957,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: colors.borderSoft,
   },
   itemRowLast: { borderBottomWidth: 0 },
   itemRowLeft: { flex: 1 },
-  itemTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  itemSubStat: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  itemStatAccent: { color: "#047857", fontWeight: "700" },
+  itemTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
+  itemSubStat: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  itemStatAccent: { color: colors.accent, fontWeight: "700" },
   itemEditBtn: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 7,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "#f9fafb",
+    backgroundColor: colors.surfaceMuted,
   },
-  itemEditBtnText: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  itemEditBtnText: { fontSize: 13, fontWeight: "600", color: colors.textSoft },
 
   // Member rows
   memberRow: {
@@ -973,28 +980,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: colors.borderSoft,
   },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  memberEmail: { fontSize: 12, color: "#6b7280", marginTop: 1 },
+  memberName: { fontSize: 14, fontWeight: "700", color: colors.text },
+  memberEmail: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
   memberRight: { alignItems: "flex-end", gap: 5 },
   changeRoleBtn: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#f9fafb",
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceMuted,
   },
-  changeRoleBtnText: { fontSize: 12, fontWeight: "600", color: "#374151" },
+  changeRoleBtnText: { fontSize: 12, fontWeight: "600", color: colors.textSoft },
 
   // Search results
   searchResults: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     borderRadius: 9,
-    backgroundColor: "#fafafa",
+    backgroundColor: colors.surfaceAlt,
     marginBottom: 12,
     overflow: "hidden",
   },
@@ -1004,17 +1011,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: colors.borderSoft,
   },
-  searchResultName: { fontSize: 13, fontWeight: "700", color: "#0f172a" },
-  searchResultEmail: { fontSize: 12, color: "#6b7280" },
-  searchResultAdd: { fontSize: 13, fontWeight: "700", color: "#047857" },
-  searchMoreNote: { fontSize: 12, color: "#9ca3af", padding: 10, textAlign: "center" },
+  searchResultName: { fontSize: 13, fontWeight: "700", color: colors.text },
+  searchResultEmail: { fontSize: 12, color: colors.textMuted },
+  searchResultAdd: { fontSize: 13, fontWeight: "700", color: colors.accent },
+  searchMoreNote: { fontSize: 12, color: colors.textFaint, padding: 10, textAlign: "center" },
 
   // Divider
   dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 12 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "#e5e7eb" },
-  dividerText: { fontSize: 12, color: "#9ca3af", fontWeight: "500" },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { fontSize: 12, color: colors.textFaint, fontWeight: "500" },
 
   // Role chips (inline invite panel)
   chipRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
@@ -1024,38 +1031,38 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#f9fafb",
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceMuted,
   },
-  chipActive: { backgroundColor: "#047857", borderColor: "#047857" },
-  chipText: { fontSize: 13, fontWeight: "600", color: "#374151", textTransform: "capitalize" },
-  chipTextActive: { color: "#fff" },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { fontSize: 13, fontWeight: "600", color: colors.textSoft, textTransform: "capitalize" },
+  chipTextActive: { color: colors.inverseText },
 
   // Inline forms
   inlineForm: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
     marginTop: 10,
   },
-  inlineFormTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a", marginBottom: 12 },
+  inlineFormTitle: { fontSize: 14, fontWeight: "700", color: colors.text, marginBottom: 12 },
   inlineFormActions: { flexDirection: "row", gap: 10, marginTop: 4 },
 
   // Create farm note
-  createFarmNote: { fontSize: 13, color: "#6b7280", lineHeight: 19, marginBottom: 12 },
-  emptyNote: { fontSize: 13, color: "#9ca3af", fontStyle: "italic", marginBottom: 8 },
+  createFarmNote: { fontSize: 13, color: colors.textMuted, lineHeight: 19, marginBottom: 12 },
+  emptyNote: { fontSize: 13, color: colors.textFaint, fontStyle: "italic", marginBottom: 8 },
 
   // Modal
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: colors.overlay,
     justifyContent: "center",
     paddingHorizontal: 24,
   },
   modalBox: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     shadowColor: "#000",
@@ -1063,9 +1070,9 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  modalTitle: { fontSize: 17, fontWeight: "800", color: "#0f172a", marginBottom: 2 },
-  modalSubtitle: { fontSize: 13, color: "#6b7280", marginBottom: 6 },
-  modalNote: { fontSize: 13, color: "#9ca3af", marginBottom: 16, lineHeight: 18 },
+  modalTitle: { fontSize: 17, fontWeight: "800", color: colors.text, marginBottom: 2 },
+  modalSubtitle: { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
+  modalNote: { fontSize: 13, color: colors.textFaint, marginBottom: 16, lineHeight: 18 },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 6 },
   roleOptionList: { gap: 8 },
   roleOptionBtn: {

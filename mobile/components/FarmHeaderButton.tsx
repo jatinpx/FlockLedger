@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,13 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useFarm } from "../lib/farm-context";
+import { useAppTheme, type AppColors } from "../lib/theme";
 
 /** Matches web header farm picker: tap to switch farm. */
 export function FarmHeaderButton() {
   const { farms, farmId, setFarmId, loading } = useFarm();
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const current = farms.find((f) => f.id === farmId);
 
@@ -20,7 +23,7 @@ export function FarmHeaderButton() {
     <>
       <Pressable onPress={() => setOpen(true)} style={styles.btn} hitSlop={8}>
         {loading ? (
-          <ActivityIndicator size="small" color="#047857" />
+          <ActivityIndicator size="small" color={colors.accent} />
         ) : (
           <Text style={styles.btnText} numberOfLines={1}>
             {current?.name ?? "Farm"}
@@ -60,41 +63,42 @@ export function FarmHeaderButton() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   btn: {
     marginRight: 12,
     maxWidth: 160,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: "#ecfdf5",
+    backgroundColor: colors.accentSoft,
   },
-  btnText: { fontSize: 13, fontWeight: "700", color: "#065f46" },
+  btnText: { fontSize: 13, fontWeight: "700", color: colors.accentText },
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: colors.drawerOverlay,
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 16,
     maxHeight: "70%",
   },
-  sheetTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12, color: "#18181b" },
+  sheetTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12, color: colors.textStrong },
   row: {
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: colors.border,
     marginBottom: 8,
+    backgroundColor: colors.surfaceAlt,
   },
-  rowOn: { borderColor: "#047857", backgroundColor: "#ecfdf5" },
-  rowName: { fontSize: 15, fontWeight: "600", color: "#18181b" },
-  rowRole: { fontSize: 12, color: "#71717a", marginTop: 2, textTransform: "capitalize" },
-  empty: { color: "#71717a", padding: 16, textAlign: "center" },
+  rowOn: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  rowName: { fontSize: 15, fontWeight: "600", color: colors.textStrong },
+  rowRole: { fontSize: 12, color: colors.textMuted, marginTop: 2, textTransform: "capitalize" },
+  empty: { color: colors.textMuted, padding: 16, textAlign: "center" },
   close: { alignItems: "center", paddingVertical: 12 },
-  closeText: { color: "#047857", fontWeight: "600" },
+  closeText: { color: colors.accent, fontWeight: "600" },
 });

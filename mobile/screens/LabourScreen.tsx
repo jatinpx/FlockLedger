@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   type Paginated,
   type PayrollListResponse,
 } from "../lib/api";
+import { useAppTheme, type AppColors } from "../lib/theme";
 import { withPagination } from "../lib/pagination";
 import { PaginatedControls } from "../components/PaginatedControls";
 
@@ -72,6 +73,8 @@ function membersAvailableForRow(row: FarmLabourRow, rows: FarmLabourRow[], membe
 export function LabourScreen() {
   const { farms, farmId } = useFarm();
   const isFocused = useIsFocused();
+  const colors = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const current = farms.find((f) => f.id === farmId);
   const canManage = current?.my_role === "owner" || current?.my_role === "manager";
   const isWorker = current?.my_role === "worker";
@@ -788,50 +791,52 @@ export function LabourScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: "#f3f4f6", padding: 16 },
+const createStyles = (colors: AppColors) => StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: colors.background, padding: 16 },
   headerCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
   },
-  screenTitle: { fontSize: 22, fontWeight: "800", color: "#0f172a" },
-  screenSub: { fontSize: 13, color: "#6b7280", marginTop: 4 },
-  muted: { padding: 16, color: "#71717a" },
-  mutedSm: { fontSize: 13, color: "#71717a", marginBottom: 12 },
+  screenTitle: { fontSize: 22, fontWeight: "800", color: colors.text },
+  screenSub: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
+  muted: { padding: 16, color: colors.textMuted },
+  mutedSm: { fontSize: 13, color: colors.textMuted, marginBottom: 12 },
   callout: {
-    backgroundColor: "#fffbeb",
+    backgroundColor: colors.warningSoft,
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#fde68a",
+    borderColor: colors.warningBorder,
   },
-  calloutText: { fontSize: 12, color: "#78350f" },
+  calloutText: { fontSize: 12, color: colors.warningText },
   calloutWorker: {
-    backgroundColor: "#f4f4f5",
-    borderColor: "#e4e4e7",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
   },
-  calloutTextWorker: { color: "#3f3f46" },
+  calloutTextWorker: { color: colors.textSoft },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
   },
-  h2: { fontSize: 17, fontWeight: "700", color: "#18181b", marginBottom: 12 },
-  label: { fontSize: 12, color: "#52525b", fontWeight: "600", marginTop: 8 },
+  h2: { fontSize: 17, fontWeight: "700", color: colors.textStrong, marginBottom: 12 },
+  label: { fontSize: 12, color: colors.textSoft, fontWeight: "600", marginTop: 8 },
   input: {
     borderWidth: 1,
-    borderColor: "#e4e4e7",
+    borderColor: colors.border,
     borderRadius: 8,
     padding: 10,
     marginTop: 4,
+    backgroundColor: colors.inputBg,
+    color: colors.inputText,
   },
   rowChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   chip: {
@@ -839,14 +844,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e4e4e7",
-    backgroundColor: "#fafafa",
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
   },
-  chipOn: { backgroundColor: "#ecfdf5", borderColor: "#6ee7b7" },
-  chipText: { fontSize: 13, fontWeight: "600", color: "#3f3f46" },
+  chipOn: { backgroundColor: colors.accentSoft, borderColor: colors.accentBorder },
+  chipText: { fontSize: 13, fontWeight: "600", color: colors.textSoft },
   btn: {
     marginTop: 16,
-    backgroundColor: "#047857",
+    backgroundColor: colors.accent,
     padding: 14,
     borderRadius: 10,
     alignItems: "center",
@@ -854,33 +859,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   btnDis: { opacity: 0.7 },
-  btnText: { color: "#fff", fontWeight: "600" },
+  btnText: { color: colors.inverseText, fontWeight: "600" },
   btnSecondary: {
     marginTop: 8,
-    backgroundColor: "#27272a",
+    backgroundColor: colors.darkButton,
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
   },
-  btnSecondaryText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  btnSecondaryText: { color: colors.inverseText, fontWeight: "600", fontSize: 14 },
   row: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     padding: 12,
     marginBottom: 8,
   },
   rowCompact: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
   },
-  rowSel: { borderColor: "#047857", backgroundColor: "#f0fdf4" },
+  rowSel: { borderColor: colors.accent, backgroundColor: colors.accentSoftAlt },
   rowTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -889,41 +894,41 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   recordHeadLeft: { flex: 1, paddingRight: 8 },
-  recordTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  recordDate: { fontSize: 11, color: "#6b7280", fontWeight: "600", marginTop: 1 },
+  recordTitle: { fontSize: 14, fontWeight: "700", color: colors.text },
+  recordDate: { fontSize: 11, color: colors.textMuted, fontWeight: "600", marginTop: 1 },
   recordStatsCompact: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
     alignItems: "center",
   },
-  statInline: { fontSize: 12, fontWeight: "700", color: "#111827" },
+  statInline: { fontSize: 12, fontWeight: "700", color: colors.inputText },
   inlinePill: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: colors.borderStrong,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
   },
-  link: { color: "#047857", fontWeight: "700", fontSize: 13 },
+  link: { color: colors.accent, fontWeight: "700", fontSize: 13 },
   dangerLink: { color: "#b91c1c", fontWeight: "600", fontSize: 13, marginTop: 6 },
-  accentText: { color: "#047857" },
-  warnText: { color: "#b45309" },
-  rowMain: { fontSize: 14, fontWeight: "700", color: "#18181b", marginTop: 8 },
-  rowSub: { fontSize: 12, color: "#6b7280", marginTop: 4 },
+  accentText: { color: colors.accent },
+  warnText: { color: colors.warning },
+  rowMain: { fontSize: 14, fontWeight: "700", color: colors.textStrong, marginTop: 8 },
+  rowSub: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
   ledgerRow: {
     borderTopWidth: 1,
-    borderTopColor: "#f4f4f5",
+    borderTopColor: colors.borderSoft,
     paddingTop: 12,
     marginTop: 12,
   },
-  ledgerMain: { fontSize: 14, fontWeight: "600", color: "#18181b" },
+  ledgerMain: { fontSize: 14, fontWeight: "600", color: colors.textStrong },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 12,
   },
-  switchLabel: { fontSize: 14, color: "#3f3f46" },
+  switchLabel: { fontSize: 14, color: colors.textSoft },
 });
