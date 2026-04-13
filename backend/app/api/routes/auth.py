@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import create_access_token, hash_password, verify_and_upgrade_password
 from app.database import get_db
 from app.deps import CurrentUser
 from app.models import User
@@ -17,7 +17,7 @@ def register(body: UserCreate, db: Session = Depends(get_db)):
     user = User(
         name=body.name,
         email=body.email,
-        password_hash=hash_password(body.password),
+        password_hash=hash_password(body.password.get_secret_value()),
     )
     db.add(user)
     db.commit()
@@ -28,11 +28,26 @@ def register(body: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
+
+    valid_password, upgraded_hash = verify_and_upgrade_password(
+        body.password.get_secret_value(), user.password_hash
+    )
+    if not valid_password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+
+    if upgraded_hash:
+        user.password_hash = upgraded_hash
+        db.add(user)
+        db.commit()
+
     token = create_access_token(user.id, extra={"email": user.email})
     return Token(access_token=token)
 

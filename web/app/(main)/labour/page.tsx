@@ -438,9 +438,37 @@ export default function LabourPage() {
 
   const selected = rows.find((r) => r.id === selectedId);
   const selectedPayroll = payroll?.workers.find((w) => w.labour_id === selectedId) ?? null;
+  const activeCount = rows.filter((r) => r.is_active).length;
+  const totalDue = rows.reduce((sum, r) => sum + r.balance_due, 0);
 
   return (
     <div className="space-y-8">
+      <section className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-white to-emerald-50/30 p-6 shadow-sm dark:border-zinc-800 dark:from-zinc-900 dark:to-emerald-950/20">
+        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Labour</h1>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          Manage workers, monthly payroll, and detailed ledger balances in one place.
+        </p>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">People</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{rows.length}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Active</p>
+          <p className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{activeCount}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Total due</p>
+          <p className="mt-2 text-xl font-semibold text-amber-700 dark:text-amber-400">{fmtInr(totalDue)}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Month</p>
+          <p className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">{payrollMonth}</p>
+        </div>
+      </section>
+
       {isWorker ? (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
           This page shows <strong>your</strong> pay balance for this farm. Worker accounts are

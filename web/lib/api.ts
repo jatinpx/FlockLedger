@@ -1,5 +1,13 @@
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+if (
+  process.env.NODE_ENV === "production" &&
+  API.startsWith("http://") &&
+  !API.startsWith("http://localhost")
+) {
+  throw new Error("In production, NEXT_PUBLIC_API_URL must use HTTPS.");
+}
+
 export function getApiBase(): string {
   return API.replace(/\/$/, "");
 }

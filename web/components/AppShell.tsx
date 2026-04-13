@@ -66,9 +66,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="border-t border-zinc-100 p-3 dark:border-zinc-800">
-          <div className="mb-2 flex justify-center">
-            <ThemeToggle />
-          </div>
           <button
             type="button"
             onClick={logout}
